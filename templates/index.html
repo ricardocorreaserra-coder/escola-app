@@ -1,0 +1,107 @@
+html = open('/content/drive/MyDrive/escola_app/index.html').read() \
+    if __import__('os').path.exists('/content/drive/MyDrive/escola_app/index.html') \
+    else None
+
+template = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Escolar</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;font-size:15px;background:#f5f5f5;color:#222;padding:1rem}
+.tabs{display:flex;gap:4px;border-bottom:1px solid #ddd;margin-bottom:1.5rem}
+.tab{padding:8px 16px;font-size:14px;border:none;background:none;cursor:pointer;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:#111;border-bottom:2px solid #111;font-weight:500}
+.section{display:none}.section.active{display:block}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem}
+.row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+input,select{padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:#fff;color:#222;min-width:0;flex:1}
+button{padding:7px 14px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:transparent;color:#222;cursor:pointer}
+button.primary{background:#222;color:#fff;border-color:#222}
+button.danger{color:#c0392b;border-color:#e0a0a0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;padding:8px 10px;border-bottom:1px solid #eee;color:#666;font-size:13px}
+td{padding:8px 10px;border-bottom:1px solid #f0f0f0}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;background:#f0f0f0;color:#555}
+.msg{font-size:13px;margin-top:6px}
+h3{font-size:16px;font-weight:500;margin-bottom:1rem}
+.check-row,.nota-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
+.check-row:last-child,.nota-row:last-child{border:none}
+.nota-row input{max-width:80px;flex:none}
+</style>
+</head>
+<body>
+<h2 style="margin-bottom:1rem;font-size:20px;font-weight:500">Sistema Escolar</h2>
+<div class="tabs">
+  <button class="tab active" onclick="showTab('alunos',this)"><i class="ti ti-user"></i> Alunos</button>
+  <button class="tab" onclick="showTab('materias',this)"><i class="ti ti-book"></i> Matérias</button>
+  <button class="tab" onclick="showTab('assoc',this)"><i class="ti ti-link"></i> Associar</button>
+  <button class="tab" onclick="showTab('chamada',this)"><i class="ti ti-calendar-check"></i> Chamada</button>
+  <button class="tab" onclick="showTab('notas',this)"><i class="ti ti-clipboard-text"></i> Notas</button>
+</div>
+<div id="sec-alunos" class="section active">
+  <div class="card"><h3>Cadastrar aluno</h3>
+    <div class="row"><input id="a-mat" placeholder="Matrícula" style="max-width:140px;flex:none"><input id="a-nome" placeholder="Nome completo"><button class="primary" onclick="addAluno()">Cadastrar</button></div>
+    <div class="msg" id="a-msg"></div>
+  </div>
+  <div class="card"><h3>Alunos cadastrados</h3><table id="t-alunos"><tr><th>Matrícula</th><th>Nome</th><th>Matérias</th><th></th></tr><tr><td colspan="4" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr></table></div>
+</div>
+<div id="sec-materias" class="section">
+  <div class="card"><h3>Cadastrar matéria</h3>
+    <div class="row"><input id="m-nome" placeholder="Nome da matéria"><input id="m-prof" placeholder="Professor"><button class="primary" onclick="addMateria()">Cadastrar</button></div>
+    <div class="msg" id="m-msg"></div>
+  </div>
+  <div class="card"><h3>Matérias cadastradas</h3><table id="t-materias"><tr><th>Matéria</th><th>Professor</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr></table></div>
+</div>
+<div id="sec-assoc" class="section">
+  <div class="card"><h3>Associar aluno a matéria</h3>
+    <div class="row"><select id="as-aluno"><option value="">Selecione o aluno</option></select><select id="as-mat"><option value="">Selecione a matéria</option></select><button class="primary" onclick="assoc()">Associar</button></div>
+    <div class="msg" id="as-msg"></div>
+  </div>
+  <div class="card"><h3>Associações ativas</h3><table id="t-assoc"><tr><th>Aluno</th><th>Matrícula</th><th>Matéria</th><th></th></tr><tr><td colspan="4" style="color:#999;font-size:13px">Nenhuma associação.</td></tr></table></div>
+</div>
+<div id="sec-chamada" class="section">
+  <div class="card"><h3>Registrar chamada</h3>
+    <div class="row"><select id="ch-mat" onchange="loadChamada()"><option value="">Selecione a matéria</option></select><input type="date" id="ch-data" style="max-width:160px;flex:none"><button class="primary" onclick="salvarChamada()">Salvar</button></div>
+    <div class="msg" id="ch-msg"></div>
+  </div>
+  <div class="card"><div id="ch-lista" style="color:#999;font-size:13px">Selecione uma matéria para ver os alunos.</div></div>
+</div>
+<div id="sec-notas" class="section">
+  <div class="card"><h3>Registrar notas</h3>
+    <div class="row"><select id="nt-mat" onchange="loadNotas()"><option value="">Selecione a matéria</option></select><input id="nt-aval" placeholder="Avaliação (ex: P1)" style="max-width:120px;flex:none"><button class="primary" onclick="salvarNotas()">Salvar</button></div>
+    <div class="msg" id="nt-msg"></div>
+  </div>
+  <div class="card"><div id="nt-lista" style="color:#999;font-size:13px">Selecione uma matéria para lançar notas.</div></div>
+</div>
+<script>
+let dados={alunos:{},materias:{}};
+async function api(url,method='GET',body=null){const opts={method,headers:{'Content-Type':'application/json'}};if(body)opts.body=JSON.stringify(body);const r=await fetch(url,opts);return r.json();}
+async function refresh(){dados=await api('/api/dados');renderAlunos();renderMaterias();renderAssoc();populateSelects();}
+function showTab(id,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('sec-'+id).classList.add('active');}
+function renderAlunos(){const tb=document.getElementById('t-alunos');const rows=Object.entries(dados.alunos);if(!rows.length){tb.innerHTML='<tr><th>Matrícula</th><th>Nome</th><th>Matérias</th><th></th></tr><tr><td colspan="4" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr>';return;}tb.innerHTML='<tr><th>Matrícula</th><th>Nome</th><th>Matérias</th><th></th></tr>'+rows.map(([mat,a])=>`<tr><td>${mat}</td><td>${a.nome}</td><td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join(' ')||'—'}</td><td><button class="danger" onclick="delAluno('${mat}')">✕</button></td></tr>`).join('');}
+function renderMaterias(){const tb=document.getElementById('t-materias');const rows=Object.entries(dados.materias);if(!rows.length){tb.innerHTML='<tr><th>Matéria</th><th>Professor</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr>';return;}tb.innerHTML='<tr><th>Matéria</th><th>Professor</th><th></th></tr>'+rows.map(([nome,m])=>`<tr><td>${nome}</td><td>${m.professor||'—'}</td><td><button class="danger" onclick="delMateria('${nome}')">✕</button></td></tr>`).join('');}
+function renderAssoc(){const tb=document.getElementById('t-assoc');const rows=[];Object.entries(dados.alunos).forEach(([mat,a])=>(a.materias||[]).forEach(m=>rows.push({mat,nome:a.nome,materia:m})));if(!rows.length){tb.innerHTML='<tr><th>Aluno</th><th>Matrícula</th><th>Matéria</th><th></th></tr><tr><td colspan="4" style="color:#999;font-size:13px">Nenhuma associação.</td></tr>';return;}tb.innerHTML='<tr><th>Aluno</th><th>Matrícula</th><th>Matéria</th><th></th></tr>'+rows.map(r=>`<tr><td>${r.nome}</td><td>${r.mat}</td><td>${r.materia}</td><td><button class="danger" onclick="desassoc('${r.mat}','${r.materia}')">✕</button></td></tr>`).join('');}
+function populateSelects(){const alunos=Object.entries(dados.alunos);const mats=Object.keys(dados.materias);['as-aluno'].forEach(id=>{const s=document.getElementById(id);const v=s.value;s.innerHTML='<option value="">Selecione o aluno</option>'+alunos.map(([m,a])=>`<option value="${m}">${a.nome} (${m})</option>`).join('');s.value=v;});['as-mat','ch-mat','nt-mat'].forEach(id=>{const s=document.getElementById(id);const v=s.value;s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');s.value=v;});}
+async function addAluno(){const mat=document.getElementById('a-mat').value.trim();const nome=document.getElementById('a-nome').value.trim();const r=await api('/api/alunos','POST',{matricula:mat,nome});const msg=document.getElementById('a-msg');if(r.ok){msg.style.color='green';msg.textContent='Aluno cadastrado!';document.getElementById('a-mat').value='';document.getElementById('a-nome').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
+async function delAluno(mat){await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');refresh();}
+async function addMateria(){const nome=document.getElementById('m-nome').value.trim();const prof=document.getElementById('m-prof').value.trim();const r=await api('/api/materias','POST',{nome,professor:prof});const msg=document.getElementById('m-msg');if(r.ok){msg.style.color='green';msg.textContent='Matéria cadastrada!';document.getElementById('m-nome').value='';document.getElementById('m-prof').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
+async function delMateria(nome){await api('/api/materias/'+encodeURIComponent(nome),'DELETE');refresh();}
+async function assoc(){const mat=document.getElementById('as-aluno').value;const materia=document.getElementById('as-mat').value;const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});const msg=document.getElementById('as-msg');if(r.ok){msg.style.color='green';msg.textContent='Associado!';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
+async function desassoc(mat,materia){await api('/api/alunos/'+encodeURIComponent(mat)+'/materias/'+encodeURIComponent(materia),'DELETE');refresh();}
+function loadChamada(){const mat=document.getElementById('ch-mat').value;const div=document.getElementById('ch-lista');if(!mat){div.textContent='Selecione uma matéria para ver os alunos.';return;}const alunos=Object.entries(dados.alunos).filter(([,a])=>(a.materias||[]).includes(mat));if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado a esta matéria.</span>';return;}div.innerHTML='<h3 style="margin-bottom:12px">Presença</h3>'+alunos.map(([m,a])=>`<div class="check-row"><input type="checkbox" id="ch-${m}" checked><label for="ch-${m}">${a.nome} <span style="color:#999;font-size:12px">(${m})</span></label></div>`).join('');}
+async function salvarChamada(){const mat=document.getElementById('ch-mat').value;const data=document.getElementById('ch-data').value;if(!mat||!data){document.getElementById('ch-msg').textContent='Selecione matéria e data.';return;}const alunos=Object.entries(dados.alunos).filter(([,a])=>(a.materias||[]).includes(mat));const presencas={};alunos.forEach(([m])=>{presencas[m]=document.getElementById('ch-'+m)?.checked||false;});const r=await api('/api/chamada','POST',{materia:mat,data,presencas});const msg=document.getElementById('ch-msg');if(r.ok){msg.style.color='green';msg.textContent='Chamada salva!';}else{msg.style.color='red';msg.textContent=r.erro;}}
+function loadNotas(){const mat=document.getElementById('nt-mat').value;const div=document.getElementById('nt-lista');if(!mat){div.textContent='Selecione uma matéria para lançar notas.';return;}const alunos=Object.entries(dados.alunos).filter(([,a])=>(a.materias||[]).includes(mat));if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado a esta matéria.</span>';return;}div.innerHTML='<h3 style="margin-bottom:12px">Notas (0–10)</h3>'+alunos.map(([m,a])=>`<div class="nota-row"><span style="flex:1">${a.nome} <span style="color:#999;font-size:12px">(${m})</span></span><input type="number" id="nt-${m}" min="0" max="10" step="0.1" placeholder="—"></div>`).join('');}
+async function salvarNotas(){const mat=document.getElementById('nt-mat').value;const aval=document.getElementById('nt-aval').value.trim();if(!mat||!aval){document.getElementById('nt-msg').textContent='Selecione matéria e informe a avaliação.';return;}const alunos=Object.entries(dados.alunos).filter(([,a])=>(a.materias||[]).includes(mat));const notas={};alunos.forEach(([m])=>{const v=document.getElementById('nt-'+m)?.value;if(v!=='')notas[m]=v;});const r=await api('/api/notas','POST',{materia:mat,avaliacao:aval,notas});const msg=document.getElementById('nt-msg');if(r.ok){msg.style.color='green';msg.textContent='Notas salvas!';}else{msg.style.color='red';msg.textContent=r.erro;}}
+document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
+refresh();
+</script>
+</body></html>"""
+
+with open('/content/templates/index.html', 'w', encoding='utf-8') as f:
+    f.write(template)
+print("✅ index.html criado!")
