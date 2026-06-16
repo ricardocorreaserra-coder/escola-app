@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 import json, os
 
-app = Flask(__name__, template_folder='/content/templates')
+app = Flask(__name__)
 DATA_FILE = '/content/drive/MyDrive/escola_app/escola_data.json'
 
 def load():
