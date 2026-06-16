@@ -1,27 +1,48 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import json, os, html
+import os, html, psycopg2, json
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-secret")
-
+app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
 SENHA = os.environ.get("APP_SENHA", "escola1234")
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "escola_data.json")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
+
+def init_db():
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS dados (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    conteudo JSONB NOT NULL
+                )
+            """)
+            c.execute("""
+                INSERT INTO dados (id, conteudo)
+                VALUES (1, '{"alunos": {}, "materias": {}}')
+                ON CONFLICT (id) DO NOTHING
+            """)
+            conn.commit()
 
 def load():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"alunos": {}, "materias": {}}
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("SELECT conteudo FROM dados WHERE id = 1")
+            row = c.fetchone()
+            return row[0] if row else {"alunos": {}, "materias": {}}
 
 def save(dados):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=2)
+    with get_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE dados SET conteudo = %s WHERE id = 1", [json.dumps(dados)])
+            conn.commit()
 
 def sanitize(text):
     return html.escape(str(text).strip())[:100]
 
 def login_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get("logado"):
@@ -33,8 +54,7 @@ def login_required(f):
 def login():
     erro = ""
     if request.method == "POST":
-        senha = request.form.get("senha", "")
-        if senha == SENHA:
+        if request.form.get("senha", "") == SENHA:
             session["logado"] = True
             return redirect(url_for("index"))
         erro = "Senha incorreta."
@@ -177,6 +197,8 @@ def salvar_notas():
             pass
     save(d)
     return jsonify({"ok": True})
+
+init_db()
 
 if __name__ == "__main__":
     app.run(debug=False, port=5000)
