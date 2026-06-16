@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Sistema Escolar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:2rem;width:100%;max-width:360px}
+h2{font-size:20px;font-weight:500;margin-bottom:1.5rem;text-align:center}
+input{width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-bottom:12px}
+button{width:100%;padding:10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer}
+.erro{color:#c0392b;font-size:13px;margin-bottom:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>Sistema Escolar</h2>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <form method="POST">
+    <input type="password" name="senha" placeholder="Senha de acesso" autofocus>
+    <button type="submit">Entrar</button>
+  </form>
+</div>
+</body>
+</html>
