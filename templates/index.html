@@ -1,8 +1,4 @@
-html = open('/content/drive/MyDrive/escola_app/index.html').read() \
-    if __import__('os').path.exists('/content/drive/MyDrive/escola_app/index.html') \
-    else None
-
-template = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -101,7 +97,3 @@ document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
 refresh();
 </script>
 </body></html>"""
-
-with open('/content/templates/index.html', 'w', encoding='utf-8') as f:
-    f.write(template)
-print("✅ index.html criado!")
