@@ -20,9 +20,14 @@ button.primary{background:#222;color:#fff;border-color:#222}
 button.danger{color:#c0392b;border-color:#e0a0a0}
 button.edit{color:#1a5276;border-color:#a9cce3}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-weight:500;padding:8px 10px;border-bottom:1px solid #eee;color:#666;font-size:13px}
-td{padding:8px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-tr:last-child td{border-bottom:none}
+th{text-align:left;font-weight:500;padding:8px 10px;border-bottom:1px solid #eee;color:#666;font-size:13px;background:#f9f9f9}
+td{padding:8px 10px;vertical-align:middle}
+.stripe tbody tr:nth-child(odd){background:#fff}
+.stripe tbody tr:nth-child(even){background:#f4f6f8}
+.stripe tbody tr.ap:nth-child(odd){background:#d4edda}
+.stripe tbody tr.ap:nth-child(even){background:#c3e6cb}
+.stripe tbody tr.rep:nth-child(odd){background:#f8d7da}
+.stripe tbody tr.rep:nth-child(even){background:#f1b0b7}
 .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;background:#f0f0f0;color:#555}
 .badge-ap{background:#d4edda;color:#155724}
 .badge-rep{background:#f8d7da;color:#721c24}
@@ -30,9 +35,8 @@ tr:last-child td{border-bottom:none}
 h3{font-size:16px;font-weight:500;margin-bottom:1rem}
 .check-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
 .check-row:last-child{border:none}
-.ap{background:#d4edda}
-.rep{background:#f8d7da}
 .media-cell{font-weight:500}
+.nota-input{width:80px;padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:#fff;color:#222}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
 .modal{background:#fff;border-radius:10px;padding:1.5rem;width:100%;max-width:360px}
 .modal h3{margin-bottom:1rem}
@@ -56,7 +60,12 @@ h3{font-size:16px;font-weight:500;margin-bottom:1rem}
     <div class="row"><input id="a-nome" placeholder="Nome completo"><button class="primary" onclick="addAluno()">Cadastrar</button></div>
     <div class="msg" id="a-msg"></div>
   </div>
-  <div class="card"><h3>Alunos cadastrados</h3><table id="t-alunos"><tr><th>Nome</th><th>Matérias</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr></table></div>
+  <div class="card"><h3>Alunos cadastrados</h3>
+    <table class="stripe" id="t-alunos">
+      <thead><tr><th>Nome</th><th>Matérias</th><th></th></tr></thead>
+      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <div id="sec-materias" class="section">
@@ -64,7 +73,12 @@ h3{font-size:16px;font-weight:500;margin-bottom:1rem}
     <div class="row"><input id="m-nome" placeholder="Nome da matéria"><input id="m-prof" placeholder="Professor"><button class="primary" onclick="addMateria()">Cadastrar</button></div>
     <div class="msg" id="m-msg"></div>
   </div>
-  <div class="card"><h3>Matérias cadastradas</h3><table id="t-materias"><tr><th>Matéria</th><th>Professor</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr></table></div>
+  <div class="card"><h3>Matérias cadastradas</h3>
+    <table class="stripe" id="t-materias">
+      <thead><tr><th>Matéria</th><th>Professor</th><th></th></tr></thead>
+      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <div id="sec-assoc" class="section">
@@ -72,7 +86,12 @@ h3{font-size:16px;font-weight:500;margin-bottom:1rem}
     <div class="row"><select id="as-aluno"><option value="">Selecione o aluno</option></select><select id="as-mat"><option value="">Selecione a matéria</option></select><button class="primary" onclick="assoc()">Associar</button></div>
     <div class="msg" id="as-msg"></div>
   </div>
-  <div class="card"><h3>Associações ativas</h3><table id="t-assoc"><tr><th>Aluno</th><th>Matéria</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr></table></div>
+  <div class="card"><h3>Associações ativas</h3>
+    <table class="stripe" id="t-assoc">
+      <thead><tr><th>Aluno</th><th>Matéria</th><th></th></tr></thead>
+      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <div id="sec-chamada" class="section">
@@ -102,7 +121,6 @@ h3{font-size:16px;font-weight:500;margin-bottom:1rem}
   <div id="bl-conteudo"></div>
 </div>
 
-<!-- Modal editar aluno -->
 <div class="modal-bg" id="modal-editar" style="display:none">
   <div class="modal">
     <h3>Editar aluno</h3>
@@ -123,29 +141,29 @@ async function api(url,method='GET',body=null){const opts={method,headers:{'Cont
 async function refresh(){dados=await api('/api/dados');renderAlunos();renderMaterias();renderAssoc();populateSelects();}
 function showTab(id,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('sec-'+id).classList.add('active');if(id==='boletim')loadBoletim();}
 function calcMedia(notas){const vals=Object.values(notas).map(Number).filter(v=>!isNaN(v));return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;}
-
-function alunosOrdenados(){
-  return Object.entries(dados.alunos).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));
-}
+function alunosOrdenados(){return Object.entries(dados.alunos).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));}
 
 function renderAlunos(){
-  const tb=document.getElementById('t-alunos');
+  const tb=document.querySelector('#t-alunos tbody');
   const rows=alunosOrdenados();
-  if(!rows.length){tb.innerHTML='<tr><th>Nome</th><th>Matérias</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr>';return;}
-  tb.innerHTML='<tr><th>Nome</th><th>Matérias</th><th></th></tr>'+rows.map(([mat,a])=>`
-    <tr>
-      <td>${a.nome}</td>
-      <td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join(' ')||'—'}</td>
-      <td style="display:flex;gap:6px">
-        <button class="edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
-        <button class="danger" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button>
-      </td>
-    </tr>`).join('');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr>';return;}
+  tb.innerHTML=rows.map(([mat,a])=>`<tr><td>${a.nome}</td><td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join(' ')||'—'}</td><td style="display:flex;gap:6px"><button class="edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button><button class="danger" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button></td></tr>`).join('');
 }
 
-function renderMaterias(){const tb=document.getElementById('t-materias');const rows=Object.entries(dados.materias);if(!rows.length){tb.innerHTML='<tr><th>Matéria</th><th>Professor</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr>';return;}tb.innerHTML='<tr><th>Matéria</th><th>Professor</th><th></th></tr>'+rows.map(([nome,m])=>`<tr><td>${nome}</td><td>${m.professor||'—'}</td><td><button class="danger" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button></td></tr>`).join('');}
+function renderMaterias(){
+  const tb=document.querySelector('#t-materias tbody');
+  const rows=Object.entries(dados.materias);
+  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr>';return;}
+  tb.innerHTML=rows.map(([nome,m])=>`<tr><td>${nome}</td><td>${m.professor||'—'}</td><td><button class="danger" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+}
 
-function renderAssoc(){const tb=document.getElementById('t-assoc');const rows=[];alunosOrdenados().forEach(([mat,a])=>(a.materias||[]).forEach(m=>rows.push({mat,nome:a.nome,materia:m})));if(!rows.length){tb.innerHTML='<tr><th>Aluno</th><th>Matéria</th><th></th></tr><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr>';return;}tb.innerHTML='<tr><th>Aluno</th><th>Matéria</th><th></th></tr>'+rows.map(r=>`<tr><td>${r.nome}</td><td>${r.materia}</td><td><button class="danger" onclick="desassoc('${r.mat}','${r.materia}')"><i class="ti ti-x"></i></button></td></tr>`).join('');}
+function renderAssoc(){
+  const tb=document.querySelector('#t-assoc tbody');
+  const rows=[];
+  alunosOrdenados().forEach(([mat,a])=>(a.materias||[]).forEach(m=>rows.push({mat,nome:a.nome,materia:m})));
+  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr>';return;}
+  tb.innerHTML=rows.map(r=>`<tr><td>${r.nome}</td><td>${r.materia}</td><td><button class="danger" onclick="desassoc('${r.mat}','${r.materia}')"><i class="ti ti-x"></i></button></td></tr>`).join('');
+}
 
 function populateSelects(){
   const alunos=alunosOrdenados();
@@ -156,24 +174,24 @@ function populateSelects(){
 
 function abrirModal(id,nome){editandoId=id;document.getElementById('edit-nome').value=nome;document.getElementById('edit-msg').textContent='';document.getElementById('modal-editar').style.display='flex';}
 function fecharModal(){editandoId=null;document.getElementById('modal-editar').style.display='none';}
-
-async function salvarEdicao(){
-  const nome=document.getElementById('edit-nome').value.trim();
-  if(!nome){document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent='Nome não pode ser vazio.';return;}
-  const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome});
-  if(r.ok){fecharModal();refresh();}
-  else{document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent=r.erro;}
-}
+async function salvarEdicao(){const nome=document.getElementById('edit-nome').value.trim();if(!nome){document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent='Nome não pode ser vazio.';return;}const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome});if(r.ok){fecharModal();refresh();}else{document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent=r.erro;}}
 
 async function addAluno(){const nome=document.getElementById('a-nome').value.trim();const r=await api('/api/alunos','POST',{nome});const msg=document.getElementById('a-msg');if(r.ok){msg.style.color='green';msg.textContent='Aluno cadastrado!';document.getElementById('a-nome').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
 async function delAluno(mat){if(!confirm('Excluir este aluno?'))return;await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');refresh();}
 async function addMateria(){const nome=document.getElementById('m-nome').value.trim();const prof=document.getElementById('m-prof').value.trim();const r=await api('/api/materias','POST',{nome,professor:prof});const msg=document.getElementById('m-msg');if(r.ok){msg.style.color='green';msg.textContent='Matéria cadastrada!';document.getElementById('m-nome').value='';document.getElementById('m-prof').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
 async function delMateria(nome){if(!confirm('Excluir esta matéria?'))return;await api('/api/materias/'+encodeURIComponent(nome),'DELETE');refresh();}
-async function assoc(){const mat=document.getElementById('as-aluno').value;const materia=document.getElementById('as-mat').value;const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});const msg=document.getElementById('as-msg');if(r.ok){msg.style.color='green';msg.textContent='Associado!';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
+async function assoc(){const mat=document.getElementById('as-aluno').value;const materia=document.getElementById('as-mat').value;if(!mat||!materia){document.getElementById('as-msg').style.color='red';document.getElementById('as-msg').textContent='Selecione aluno e matéria.';return;}const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});const msg=document.getElementById('as-msg');if(r.ok){msg.style.color='green';msg.textContent='Associado!';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
 async function desassoc(mat,materia){await api('/api/alunos/'+encodeURIComponent(mat)+'/materias/'+encodeURIComponent(materia),'DELETE');refresh();}
 
-function loadChamada(){const mat=document.getElementById('ch-mat').value;const div=document.getElementById('ch-lista');if(!mat){div.textContent='Selecione uma matéria para ver os alunos.';return;}const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado a esta matéria.</span>';return;}div.innerHTML='<h3 style="margin-bottom:12px">Presença</h3>'+alunos.map(([m,a])=>`<div class="check-row"><input type="checkbox" id="ch-${m}" checked><label for="ch-${m}">${a.nome}</label></div>`).join('');}
-async function salvarChamada(){const mat=document.getElementById('ch-mat').value;const data=document.getElementById('ch-data').value;if(!mat||!data){document.getElementById('ch-msg').textContent='Selecione matéria e data.';return;}const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));const presencas={};alunos.forEach(([m])=>{presencas[m]=document.getElementById('ch-'+m)?.checked||false;});const r=await api('/api/chamada','POST',{materia:mat,data,presencas});const msg=document.getElementById('ch-msg');if(r.ok){msg.style.color='green';msg.textContent='Chamada salva!';}else{msg.style.color='red';msg.textContent=r.erro;}}
+function loadChamada(){
+  const mat=document.getElementById('ch-mat').value;
+  const div=document.getElementById('ch-lista');
+  if(!mat){div.textContent='Selecione uma matéria para ver os alunos.';return;}
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado a esta matéria.</span>';return;}
+  div.innerHTML='<h3 style="margin-bottom:12px">Presença</h3>'+alunos.map(([m,a])=>`<div class="check-row"><input type="checkbox" id="ch-${m}" checked><label for="ch-${m}">${a.nome}</label></div>`).join('');
+}
+async function salvarChamada(){const mat=document.getElementById('ch-mat').value;const data=document.getElementById('ch-data').value;if(!mat||!data){document.getElementById('ch-msg').style.color='red';document.getElementById('ch-msg').textContent='Selecione matéria e data.';return;}const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));const presencas={};alunos.forEach(([m])=>{presencas[m]=document.getElementById('ch-'+m)?.checked||false;});const r=await api('/api/chamada','POST',{materia:mat,data,presencas});const msg=document.getElementById('ch-msg');if(r.ok){msg.style.color='green';msg.textContent='Chamada salva!';}else{msg.style.color='red';msg.textContent=r.erro;}}
 
 function loadNotas(){
   const mat=document.getElementById('nt-mat').value;
@@ -182,30 +200,27 @@ function loadNotas(){
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado.</span>';return;}
   const todasAvals=[...new Set(alunos.flatMap(([m])=>Object.keys(dados.materias[mat]?.notas?.[m]||{})))].sort();
-  let html='<table><tr><th>Aluno</th>';
+  let html='<div style="overflow-x:auto"><table class="stripe" style="min-width:500px">';
+  html+='<thead><tr><th>Aluno</th>';
   todasAvals.forEach(av=>{html+=`<th>${av}</th>`;});
-  html+='<th>Média</th></tr>';
+  html+='<th>Nova nota</th><th>Média</th></tr></thead><tbody>';
   alunos.forEach(([m,a])=>{
     const notasAluno=dados.materias[mat]?.notas?.[m]||{};
     const media=calcMedia(notasAluno);
     const cor=media===null?'':(media>=6?'ap':'rep');
     html+=`<tr class="${cor}"><td>${a.nome}</td>`;
-    todasAvals.forEach(av=>{html+=`<td>${notasAluno[av]!==undefined?notasAluno[av]:'—'}</td>`;});
-    html+=`<td class="media-cell">${media!==null?media.toFixed(2):'—'}</td></tr>`;
+    todasAvals.forEach(av=>{html+=`<td style="text-align:center">${notasAluno[av]!==undefined?notasAluno[av]:'—'}</td>`;});
+    html+=`<td><input class="nota-input" type="number" min="0" max="10" step="0.1" placeholder="—" data-id="${m}"></td>`;
+    html+=`<td class="media-cell" style="text-align:center">${media!==null?media.toFixed(2):'—'}</td></tr>`;
   });
-  html+='</table><div style="margin-top:1rem">';
-  alunos.forEach(([m,a])=>{html+=`<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span style="flex:1;font-size:14px">${a.nome}</span><input type="number" min="0" max="10" step="0.1" placeholder="nota" data-id="${m}" style="max-width:80px;flex:none"></div>`;});
-  html+=`<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input id="nt-aval-inline" placeholder="Avaliação (ex: P2)" style="max-width:160px">
-    <button class="primary" onclick="salvarNotas()">Salvar notas</button>
-  </div></div>`;
+  html+='</tbody></table></div>';
   div.innerHTML=html;
 }
 
 async function salvarNotas(){
   const mat=document.getElementById('nt-mat').value;
-  const aval=(document.getElementById('nt-aval')?.value||document.getElementById('nt-aval-inline')?.value||'').trim();
-  if(!mat||!aval){document.getElementById('nt-msg').style.color='red';document.getElementById('nt-msg').textContent='Informe a avaliação.';return;}
+  const aval=document.getElementById('nt-aval').value.trim();
+  if(!mat||!aval){document.getElementById('nt-msg').style.color='red';document.getElementById('nt-msg').textContent='Selecione a matéria e informe a avaliação.';return;}
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   const notas={};
   alunos.forEach(([m])=>{const v=document.querySelector(`input[data-id="${m}"]`)?.value;if(v&&v!=='')notas[m]=v;});
@@ -239,11 +254,11 @@ function loadBoletim(){
     else{html+=`<span class="badge">Sem notas</span>`;}
     html+='</div>';
     if(avals.length){
-      html+='<table><tr>';
+      html+='<table><thead><tr>';
       avals.forEach(av=>{html+=`<th>${av}</th>`;});
-      html+='</tr><tr>';
+      html+='</tr></thead><tbody><tr>';
       avals.forEach(av=>{html+=`<td>${notasAluno[av]}</td>`;});
-      html+='</tr></table>';
+      html+='</tr></tbody></table>';
     }else{html+='<span style="font-size:13px;color:#666">Nenhuma nota lançada.</span>';}
     html+='</div>';
   });
