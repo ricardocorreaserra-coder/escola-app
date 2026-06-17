@@ -4,131 +4,611 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema Escolar</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:sans-serif;font-size:15px;background:#f5f5f5;color:#222;padding:1rem}
-.tabs{display:flex;gap:4px;border-bottom:1px solid #ddd;margin-bottom:1.5rem}
-.tab{padding:8px 16px;font-size:14px;border:none;background:none;cursor:pointer;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tab.active{color:#111;border-bottom:2px solid #111;font-weight:500}
-.section{display:none}.section.active{display:block}
-.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem}
-.row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
-input,select{padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:#fff;color:#222;min-width:0;flex:1}
-button{padding:7px 14px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:transparent;color:#222;cursor:pointer}
-button.primary{background:#222;color:#fff;border-color:#222}
-button.danger{color:#c0392b;border-color:#e0a0a0}
-button.edit{color:#1a5276;border-color:#a9cce3}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-weight:500;padding:8px 10px;border-bottom:1px solid #eee;color:#666;font-size:13px;background:#f9f9f9}
-td{padding:8px 10px;vertical-align:middle}
-.stripe tbody tr:nth-child(odd){background:#fff}
-.stripe tbody tr:nth-child(even){background:#f4f6f8}
-.stripe tbody tr.ap:nth-child(odd){background:#d4edda}
-.stripe tbody tr.ap:nth-child(even){background:#c3e6cb}
-.stripe tbody tr.rep:nth-child(odd){background:#f8d7da}
-.stripe tbody tr.rep:nth-child(even){background:#f1b0b7}
-.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;background:#f0f0f0;color:#555}
-.badge-ap{background:#d4edda;color:#155724}
-.badge-rep{background:#f8d7da;color:#721c24}
-.msg{font-size:13px;margin-top:6px}
-h3{font-size:16px;font-weight:500;margin-bottom:1rem}
-.check-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:14px}
-.check-row:last-child{border:none}
-.media-cell{font-weight:500}
-.nota-input{width:80px;padding:5px 8px;border:1px solid #ccc;border-radius:6px;font-size:14px;background:#fff;color:#222}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
-.modal{background:#fff;border-radius:10px;padding:1.5rem;width:100%;max-width:360px}
-.modal h3{margin-bottom:1rem}
-.modal input{width:100%;margin-bottom:10px}
-.modal .row{justify-content:flex-end;margin-bottom:0}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  padding: 0;
+  min-height: 100vh;
+}
+.app-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.app-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+}
+.btn-logout {
+  color: #64748b;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s, color 0.2s;
+}
+.btn-logout:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+.tabs-container {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 2rem;
+}
+.tabs {
+  display: flex;
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.tab {
+  padding: 14px 4px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #64748b;
+  position: relative;
+  transition: color 0.2s;
+}
+.tab:hover {
+  color: #0f172a;
+}
+.tab.active {
+  color: #0284c7; /* Cyan / Light Blue text */
+  font-weight: 600;
+}
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #0ea5e9; /* Underline indicator */
+  border-radius: 2px;
+}
+.main-content {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+.section {
+  display: none;
+}
+.section.active {
+  display: block;
+}
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.025em;
+}
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+.card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 1.25rem;
+}
+.form-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 200px;
+}
+.form-group.small {
+  flex: 0 0 180px;
+  min-width: 150px;
+}
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  text-transform: none;
+}
+input, select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 42px;
+}
+input:focus, select:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.2s, transform 0.1s;
+  height: 42px;
+  border: none;
+}
+.btn-primary {
+  background-color: #0ea5e9;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: #0284c7;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+.btn-blue {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+.btn-blue:hover {
+  background-color: #1d4ed8;
+}
+.btn-blue:active {
+  transform: scale(0.98);
+}
+.table-container {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+th {
+  font-weight: 600;
+  color: #475569;
+  background-color: #f8fafc;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+tr:last-child td {
+  border-bottom: none;
+}
+.text-center {
+  text-align: center;
+}
+.font-medium {
+  font-weight: 500;
+}
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  color: #475569;
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+  font-size: 16px;
+}
+.btn-icon.btn-edit {
+  color: #2563eb;
+}
+.btn-icon.btn-edit:hover {
+  background-color: #dbeafe;
+}
+.btn-icon.btn-delete {
+  color: #ef4444;
+}
+.btn-icon.btn-delete:hover {
+  background-color: #fee2e2;
+}
+.msg {
+  font-size: 13px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+}
+.check-row:last-child {
+  border-bottom: none;
+}
+.check-row:hover {
+  background-color: #f8fafc;
+}
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0ea5e9;
+  cursor: pointer;
+}
+.check-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  flex: 1;
+}
+.nota-grid-input {
+  width: 68px;
+  text-align: center;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 36px;
+}
+.nota-grid-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.media-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  height: 26px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ffffff;
+  padding: 2px 10px;
+}
+.media-badge.aprovado {
+  background-color: #10b981; /* Emerald-500 */
+}
+.media-badge.reprovado {
+  background-color: #f87171; /* Light red / coral */
+}
+.media-badge.none {
+  background-color: #94a3b8; /* Slate-400 */
+}
+.table-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+.btn-save-notas {
+  background-color: #1e293b;
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.btn-save-notas:hover {
+  background-color: #0f172a;
+}
+.btn-save-notas:active {
+  transform: scale(0.98);
+}
+.boletim-card {
+  margin-bottom: 1.5rem;
+}
+.boletim-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.boletim-card-header strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.no-grades {
+  font-size: 13px;
+  color: #64748b;
+  padding: 8px 0;
+}
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1rem;
+}
+.modal input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 1.25rem;
+  outline: none;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 </style>
 </head>
 <body>
-<h2 style="margin-bottom:1rem;font-size:20px;font-weight:500">Sistema Escolar</h2>
-<div class="tabs">
-  <button class="tab active" onclick="showTab('alunos',this)"><i class="ti ti-user"></i> Alunos</button>
-  <button class="tab" onclick="showTab('materias',this)"><i class="ti ti-book"></i> Matérias</button>
-  <button class="tab" onclick="showTab('assoc',this)"><i class="ti ti-link"></i> Associar</button>
-  <button class="tab" onclick="showTab('chamada',this)"><i class="ti ti-calendar-check"></i> Chamada</button>
-  <button class="tab" onclick="showTab('notas',this)"><i class="ti ti-clipboard-text"></i> Notas</button>
-  <button class="tab" onclick="showTab('boletim',this)"><i class="ti ti-chart-bar"></i> Boletim</button>
-</div>
 
-<div id="sec-alunos" class="section active">
-  <div class="card"><h3>Cadastrar aluno</h3>
-    <div class="row"><input id="a-nome" placeholder="Nome completo"><button class="primary" onclick="addAluno()">Cadastrar</button></div>
-    <div class="msg" id="a-msg"></div>
-  </div>
-  <div class="card"><h3>Alunos cadastrados</h3>
-    <table class="stripe" id="t-alunos">
-      <thead><tr><th>Nome</th><th>Matérias</th><th></th></tr></thead>
-      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr></tbody>
-    </table>
+<header class="app-header">
+  <h1>Sistema Escolar</h1>
+  <a href="/logout" class="btn-logout"><i class="ti ti-logout"></i> Sair</a>
+</header>
+
+<div class="tabs-container">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('alunos',this)">Alunos</button>
+    <button class="tab" onclick="showTab('materias',this)">Matérias</button>
+    <button class="tab" onclick="showTab('assoc',this)">Associar</button>
+    <button class="tab" onclick="showTab('chamada',this)">Chamada</button>
+    <button class="tab" onclick="showTab('notas',this)">Notas</button>
+    <button class="tab" onclick="showTab('boletim',this)">Boletim</button>
   </div>
 </div>
 
-<div id="sec-materias" class="section">
-  <div class="card"><h3>Cadastrar matéria</h3>
-    <div class="row"><input id="m-nome" placeholder="Nome da matéria"><input id="m-prof" placeholder="Professor"><button class="primary" onclick="addMateria()">Cadastrar</button></div>
-    <div class="msg" id="m-msg"></div>
-  </div>
-  <div class="card"><h3>Matérias cadastradas</h3>
-    <table class="stripe" id="t-materias">
-      <thead><tr><th>Matéria</th><th>Professor</th><th></th></tr></thead>
-      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<div id="sec-assoc" class="section">
-  <div class="card"><h3>Associar aluno a matéria</h3>
-    <div class="row"><select id="as-aluno"><option value="">Selecione o aluno</option></select><select id="as-mat"><option value="">Selecione a matéria</option></select><button class="primary" onclick="assoc()">Associar</button></div>
-    <div class="msg" id="as-msg"></div>
-  </div>
-  <div class="card"><h3>Associações ativas</h3>
-    <table class="stripe" id="t-assoc">
-      <thead><tr><th>Aluno</th><th>Matéria</th><th></th></tr></thead>
-      <tbody><tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<div id="sec-chamada" class="section">
-  <div class="card"><h3>Registrar chamada</h3>
-    <div class="row"><select id="ch-mat" onchange="loadChamada()"><option value="">Selecione a matéria</option></select><input type="date" id="ch-data" style="max-width:160px;flex:none"><button class="primary" onclick="salvarChamada()">Salvar</button></div>
-    <div class="msg" id="ch-msg"></div>
-  </div>
-  <div class="card"><div id="ch-lista" style="color:#999;font-size:13px">Selecione uma matéria para ver os alunos.</div></div>
-</div>
-
-<div id="sec-notas" class="section">
-  <div class="card"><h3>Registrar notas</h3>
-    <div class="row">
-      <select id="nt-mat" onchange="loadNotas()"><option value="">Selecione a matéria</option></select>
-      <input id="nt-aval" placeholder="Avaliação (ex: P1)" style="max-width:130px;flex:none">
-      <button class="primary" onclick="salvarNotas()">Salvar</button>
+<main class="main-content">
+  <!-- SEÇÃO: ALUNOS -->
+  <div id="sec-alunos" class="section active">
+    <h2 class="section-title">Alunos</h2>
+    <div class="card">
+      <h3>Cadastrar aluno</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="a-nome" placeholder="Nome completo do aluno">
+        </div>
+        <button class="btn btn-primary" onclick="addAluno()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="a-msg"></div>
     </div>
-    <div class="msg" id="nt-msg"></div>
+    <div class="card">
+      <h3>Alunos cadastrados</h3>
+      <div class="table-container">
+        <table id="t-alunos">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Matérias</th>
+              <th style="width: 100px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
-  <div class="card"><div id="nt-lista" style="color:#999;font-size:13px">Selecione uma matéria para lançar notas.</div></div>
-</div>
 
-<div id="sec-boletim" class="section">
-  <div class="card"><h3>Boletim por aluno</h3>
-    <div class="row"><select id="bl-aluno" onchange="loadBoletim()"><option value="">Selecione o aluno</option></select></div>
+  <!-- SEÇÃO: MATÉRIAS -->
+  <div id="sec-materias" class="section">
+    <h2 class="section-title">Matérias</h2>
+    <div class="card">
+      <h3>Cadastrar matéria</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="m-nome" placeholder="Nome da matéria">
+        </div>
+        <div class="form-group">
+          <input id="m-prof" placeholder="Professor responsável">
+        </div>
+        <button class="btn btn-primary" onclick="addMateria()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="m-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Matérias cadastradas</h3>
+      <div class="table-container">
+        <table id="t-materias">
+          <thead>
+            <tr>
+              <th>Matéria</th>
+              <th>Professor</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
-  <div id="bl-conteudo"></div>
-</div>
 
+  <!-- SEÇÃO: ASSOCIAR -->
+  <div id="sec-assoc" class="section">
+    <h2 class="section-title">Associar</h2>
+    <div class="card">
+      <h3>Associar aluno a matéria</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="as-aluno">
+            <option value="">Selecione o aluno</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="as-mat">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="assoc()"><i class="ti ti-link"></i> Associar</button>
+      </div>
+      <div class="msg" id="as-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Associações ativas</h3>
+      <div class="table-container">
+        <table id="t-assoc">
+          <thead>
+            <tr>
+              <th>Aluno</th>
+              <th>Matéria</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma associação ativa.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: CHAMADA -->
+  <div id="sec-chamada" class="section">
+    <h2 class="section-title">Chamada</h2>
+    <div class="card">
+      <h3>Registrar chamada</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="ch-mat" onchange="loadChamada()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group small">
+          <input type="date" id="ch-data">
+        </div>
+        <button class="btn btn-primary" onclick="salvarChamada()"><i class="ti ti-device-floppy"></i> Salvar</button>
+      </div>
+      <div class="msg" id="ch-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Presença</h3>
+      <div id="ch-lista" style="color:#94a3b8">Selecione uma matéria para ver os alunos.</div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: NOTAS -->
+  <div id="sec-notas" class="section">
+    <h2 class="section-title">Notas</h2>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="nt-mat">Matéria</label>
+          <select id="nt-mat" onchange="loadNotas()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="nt-aval">Nova avaliação</label>
+          <input id="nt-aval" placeholder="Atividade 3">
+        </div>
+        <div style="flex: 0 0 auto;">
+          <button class="btn btn-blue" onclick="addAvaliacao()"><i class="ti ti-plus"></i> Adicionar</button>
+        </div>
+      </div>
+      <div class="msg" id="nt-msg"></div>
+    </div>
+    <div id="nt-lista" style="color:#94a3b8">Selecione uma matéria para lançar notas.</div>
+  </div>
+
+  <!-- SEÇÃO: BOLETIM -->
+  <div id="sec-boletim" class="section">
+    <h2 class="section-title">Boletim</h2>
+    <div class="card">
+      <h3>Boletim por aluno</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="bl-aluno" onchange="loadBoletim()">
+            <option value="">Selecione o aluno</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="bl-conteudo"></div>
+  </div>
+</main>
+
+<!-- MODAL EDITAR ALUNO -->
 <div class="modal-bg" id="modal-editar" style="display:none">
   <div class="modal">
     <h3>Editar aluno</h3>
     <input id="edit-nome" placeholder="Novo nome">
     <div class="msg" id="edit-msg"></div>
-    <div class="row" style="margin-top:10px">
-      <button onclick="fecharModal()">Cancelar</button>
-      <button class="primary" onclick="salvarEdicao()">Salvar</button>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn" style="background:#f1f5f9; color:#475569" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
     </div>
   </div>
 </div>
@@ -136,99 +616,433 @@ h3{font-size:16px;font-weight:500;margin-bottom:1rem}
 <script>
 let dados={alunos:{},materias:{}};
 let editandoId=null;
+let currentEvaluations=[];
 
-async function api(url,method='GET',body=null){const opts={method,headers:{'Content-Type':'application/json'}};if(body)opts.body=JSON.stringify(body);const r=await fetch(url,opts);return r.json();}
-async function refresh(){dados=await api('/api/dados');renderAlunos();renderMaterias();renderAssoc();populateSelects();}
-function showTab(id,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('sec-'+id).classList.add('active');if(id==='boletim')loadBoletim();}
-function calcMedia(notas){const vals=Object.values(notas).map(Number).filter(v=>!isNaN(v));return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;}
-function alunosOrdenados(){return Object.entries(dados.alunos).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));}
+async function api(url,method='GET',body=null){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  const r=await fetch(url,opts);
+  return r.json();
+}
+
+async function refresh(){
+  dados=await api('/api/dados');
+  renderAlunos();
+  renderMaterias();
+  renderAssoc();
+  populateSelects();
+}
+
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('sec-'+id).classList.add('active');
+  if(id==='boletim') loadBoletim();
+  if(id==='notas') loadNotas();
+  if(id==='chamada') loadChamada();
+}
+
+function calcMedia(notas){
+  const vals=Object.values(notas).map(Number).filter(v=>!isNaN(v));
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+}
+
+function alunosOrdenados(){
+  return Object.entries(dados.alunos).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));
+}
 
 function renderAlunos(){
   const tb=document.querySelector('#t-alunos tbody');
   const rows=alunosOrdenados();
-  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhum aluno cadastrado.</td></tr>';return;}
-  tb.innerHTML=rows.map(([mat,a])=>`<tr><td>${a.nome}</td><td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join(' ')||'—'}</td><td style="display:flex;gap:6px"><button class="edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button><button class="danger" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>';
+    return;
+  }
+  tb.innerHTML=rows.map(([mat,a])=>`
+    <tr>
+      <td class="font-medium">${a.nome}</td>
+      <td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join('')||'—'}</td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        <button class="btn-icon btn-edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
+        <button class="btn-icon btn-delete" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function renderMaterias(){
   const tb=document.querySelector('#t-materias tbody');
   const rows=Object.entries(dados.materias);
-  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma matéria cadastrada.</td></tr>';return;}
-  tb.innerHTML=rows.map(([nome,m])=>`<tr><td>${nome}</td><td>${m.professor||'—'}</td><td><button class="danger" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>';
+    return;
+  }
+  tb.innerHTML=rows.map(([nome,m])=>`
+    <tr>
+      <td class="font-medium">${nome}</td>
+      <td>${m.professor||'—'}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function renderAssoc(){
   const tb=document.querySelector('#t-assoc tbody');
   const rows=[];
   alunosOrdenados().forEach(([mat,a])=>(a.materias||[]).forEach(m=>rows.push({mat,nome:a.nome,materia:m})));
-  if(!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:#999;font-size:13px">Nenhuma associação.</td></tr>';return;}
-  tb.innerHTML=rows.map(r=>`<tr><td>${r.nome}</td><td>${r.materia}</td><td><button class="danger" onclick="desassoc('${r.mat}','${r.materia}')"><i class="ti ti-x"></i></button></td></tr>`).join('');
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma associação ativa.</td></tr>';
+    return;
+  }
+  tb.innerHTML=rows.map(r=>`
+    <tr>
+      <td class="font-medium">${r.nome}</td>
+      <td>${r.materia}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="desassoc('${r.mat}','${r.materia}')"><i class="ti ti-x"></i></button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function populateSelects(){
   const alunos=alunosOrdenados();
   const mats=Object.keys(dados.materias);
-  ['as-aluno','bl-aluno'].forEach(id=>{const s=document.getElementById(id);const v=s.value;s.innerHTML='<option value="">Selecione o aluno</option>'+alunos.map(([m,a])=>`<option value="${m}">${a.nome}</option>`).join('');s.value=v;});
-  ['as-mat','ch-mat','nt-mat'].forEach(id=>{const s=document.getElementById(id);const v=s.value;s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');s.value=v;});
+  ['as-aluno','bl-aluno'].forEach(id=>{
+    const s=document.getElementById(id);
+    const v=s.value;
+    s.innerHTML='<option value="">Selecione o aluno</option>'+alunos.map(([m,a])=>`<option value="${m}">${a.nome}</option>`).join('');
+    s.value=v;
+  });
+  ['as-mat','ch-mat','nt-mat'].forEach(id=>{
+    const s=document.getElementById(id);
+    const v=s.value;
+    s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');
+    s.value=v;
+  });
 }
 
-function abrirModal(id,nome){editandoId=id;document.getElementById('edit-nome').value=nome;document.getElementById('edit-msg').textContent='';document.getElementById('modal-editar').style.display='flex';}
-function fecharModal(){editandoId=null;document.getElementById('modal-editar').style.display='none';}
-async function salvarEdicao(){const nome=document.getElementById('edit-nome').value.trim();if(!nome){document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent='Nome não pode ser vazio.';return;}const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome});if(r.ok){fecharModal();refresh();}else{document.getElementById('edit-msg').style.color='red';document.getElementById('edit-msg').textContent=r.erro;}}
+function abrirModal(id,nome){
+  editandoId=id;
+  document.getElementById('edit-nome').value=nome;
+  document.getElementById('edit-msg').textContent='';
+  document.getElementById('modal-editar').style.display='flex';
+}
 
-async function addAluno(){const nome=document.getElementById('a-nome').value.trim();const r=await api('/api/alunos','POST',{nome});const msg=document.getElementById('a-msg');if(r.ok){msg.style.color='green';msg.textContent='Aluno cadastrado!';document.getElementById('a-nome').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
-async function delAluno(mat){if(!confirm('Excluir este aluno?'))return;await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');refresh();}
-async function addMateria(){const nome=document.getElementById('m-nome').value.trim();const prof=document.getElementById('m-prof').value.trim();const r=await api('/api/materias','POST',{nome,professor:prof});const msg=document.getElementById('m-msg');if(r.ok){msg.style.color='green';msg.textContent='Matéria cadastrada!';document.getElementById('m-nome').value='';document.getElementById('m-prof').value='';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
-async function delMateria(nome){if(!confirm('Excluir esta matéria?'))return;await api('/api/materias/'+encodeURIComponent(nome),'DELETE');refresh();}
-async function assoc(){const mat=document.getElementById('as-aluno').value;const materia=document.getElementById('as-mat').value;if(!mat||!materia){document.getElementById('as-msg').style.color='red';document.getElementById('as-msg').textContent='Selecione aluno e matéria.';return;}const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});const msg=document.getElementById('as-msg');if(r.ok){msg.style.color='green';msg.textContent='Associado!';refresh();}else{msg.style.color='red';msg.textContent=r.erro;}}
-async function desassoc(mat,materia){await api('/api/alunos/'+encodeURIComponent(mat)+'/materias/'+encodeURIComponent(materia),'DELETE');refresh();}
+function fecharModal(){
+  editandoId=null;
+  document.getElementById('modal-editar').style.display='none';
+}
+
+async function salvarEdicao(){
+  const nome=document.getElementById('edit-nome').value.trim();
+  if(!nome){
+    document.getElementById('edit-msg').style.color='#ef4444';
+    document.getElementById('edit-msg').textContent='Nome não pode ser vazio.';
+    return;
+  }
+  const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome});
+  if(r.ok){
+    fecharModal();
+    refresh();
+  }else{
+    document.getElementById('edit-msg').style.color='#ef4444';
+    document.getElementById('edit-msg').textContent=r.erro;
+  }
+}
+
+async function addAluno(){
+  const nome=document.getElementById('a-nome').value.trim();
+  const r=await api('/api/alunos','POST',{nome});
+  const msg=document.getElementById('a-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Aluno cadastrado com sucesso!';
+    document.getElementById('a-nome').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delAluno(mat){
+  if(!confirm('Excluir este aluno?'))return;
+  await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');
+  refresh();
+}
+
+async function addMateria(){
+  const nome=document.getElementById('m-nome').value.trim();
+  const prof=document.getElementById('m-prof').value.trim();
+  const r=await api('/api/materias','POST',{nome,professor:prof});
+  const msg=document.getElementById('m-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Matéria cadastrada com sucesso!';
+    document.getElementById('m-nome').value='';
+    document.getElementById('m-prof').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delMateria(nome){
+  if(!confirm('Excluir esta matéria?'))return;
+  await api('/api/materias/'+encodeURIComponent(nome),'DELETE');
+  refresh();
+}
+
+async function assoc(){
+  const mat=document.getElementById('as-aluno').value;
+  const materia=document.getElementById('as-mat').value;
+  if(!mat||!materia){
+    document.getElementById('as-msg').style.color='#ef4444';
+    document.getElementById('as-msg').textContent='Selecione aluno e matéria.';
+    return;
+  }
+  const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});
+  const msg=document.getElementById('as-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Associação realizada!';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function desassoc(mat,materia){
+  await api('/api/alunos/'+encodeURIComponent(mat)+'/materias/'+encodeURIComponent(materia),'DELETE');
+  refresh();
+}
 
 function loadChamada(){
   const mat=document.getElementById('ch-mat').value;
   const div=document.getElementById('ch-lista');
-  if(!mat){div.textContent='Selecione uma matéria para ver os alunos.';return;}
+  if(!mat){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para ver os alunos.</div>';
+    return;
+  }
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
-  if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado a esta matéria.</span>';return;}
-  div.innerHTML='<h3 style="margin-bottom:12px">Presença</h3>'+alunos.map(([m,a])=>`<div class="check-row"><input type="checkbox" id="ch-${m}" checked><label for="ch-${m}">${a.nome}</label></div>`).join('');
+  if(!alunos.length){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
+    return;
+  }
+  div.innerHTML=alunos.map(([m,a])=>`
+    <div class="check-row">
+      <input type="checkbox" id="ch-${m}" checked>
+      <label for="ch-${m}">${a.nome}</label>
+    </div>
+  `).join('');
 }
-async function salvarChamada(){const mat=document.getElementById('ch-mat').value;const data=document.getElementById('ch-data').value;if(!mat||!data){document.getElementById('ch-msg').style.color='red';document.getElementById('ch-msg').textContent='Selecione matéria e data.';return;}const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));const presencas={};alunos.forEach(([m])=>{presencas[m]=document.getElementById('ch-'+m)?.checked||false;});const r=await api('/api/chamada','POST',{materia:mat,data,presencas});const msg=document.getElementById('ch-msg');if(r.ok){msg.style.color='green';msg.textContent='Chamada salva!';}else{msg.style.color='red';msg.textContent=r.erro;}}
+
+async function salvarChamada(){
+  const mat=document.getElementById('ch-mat').value;
+  const data=document.getElementById('ch-data').value;
+  const msg=document.getElementById('ch-msg');
+  if(!mat||!data){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione matéria e data.';
+    return;
+  }
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  const presencas={};
+  alunos.forEach(([m])=>{
+    presencas[m]=document.getElementById('ch-'+m)?.checked||false;
+  });
+  const r=await api('/api/chamada','POST',{materia:mat,data,presencas});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Chamada salva!';
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
 
 function loadNotas(){
   const mat=document.getElementById('nt-mat').value;
   const div=document.getElementById('nt-lista');
-  if(!mat){div.textContent='Selecione uma matéria para lançar notas.';return;}
+  const msg=document.getElementById('nt-msg');
+  msg.textContent='';
+  
+  if(!mat){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para lançar notas.</div>';
+    return;
+  }
+  
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
-  if(!alunos.length){div.innerHTML='<span style="color:#999;font-size:13px">Nenhum aluno associado.</span>';return;}
-  const todasAvals=[...new Set(alunos.flatMap(([m])=>Object.keys(dados.materias[mat]?.notas?.[m]||{})))].sort();
-  let html='<div style="overflow-x:auto"><table class="stripe" style="min-width:500px">';
+  if(!alunos.length){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
+    return;
+  }
+
+  // Coleta avaliações existentes
+  const avalsSet=new Set();
+  alunos.forEach(([m])=>{
+    const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+    Object.keys(notasAluno).forEach(av=>avalsSet.add(av));
+  });
+  
+  currentEvaluations=[...avalsSet].sort();
+  if(currentEvaluations.length===0){
+    currentEvaluations=['P1','P2'];
+  }
+
+  renderNotasTable(alunos,mat);
+}
+
+function renderNotasTable(alunos,mat){
+  const div=document.getElementById('nt-lista');
+  
+  let html='<div class="table-container"><table class="stripe">';
   html+='<thead><tr><th>Aluno</th>';
-  todasAvals.forEach(av=>{html+=`<th>${av}</th>`;});
-  html+='<th>Nova nota</th><th>Média</th></tr></thead><tbody>';
+  currentEvaluations.forEach(av=>{
+    html+=`<th class="text-center">${av}</th>`;
+  });
+  html+='<th class="text-center">Média</th></tr></thead><tbody>';
+  
   alunos.forEach(([m,a])=>{
     const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+    
+    html+=`<tr><td class="font-medium" style="color: #334155;">${a.nome}</td>`;
+    
+    currentEvaluations.forEach(av=>{
+      const val=notasAluno[av]!==undefined?notasAluno[av]:'';
+      html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
+    });
+    
     const media=calcMedia(notasAluno);
-    const cor=media===null?'':(media>=6?'ap':'rep');
-    html+=`<tr class="${cor}"><td>${a.nome}</td>`;
-    todasAvals.forEach(av=>{html+=`<td style="text-align:center">${notasAluno[av]!==undefined?notasAluno[av]:'—'}</td>`;});
-    html+=`<td><input class="nota-input" type="number" min="0" max="10" step="0.1" placeholder="—" data-id="${m}"></td>`;
-    html+=`<td class="media-cell" style="text-align:center">${media!==null?media.toFixed(2):'—'}</td></tr>`;
+    const badgeClass=media===null?'none':(media>=6?'aprovado':'reprovado');
+    const mediaText=media!==null?media.toFixed(2):'—';
+    
+    html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td></tr>`;
   });
+  
   html+='</tbody></table></div>';
+  html+=`<div class="table-footer"><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
+  
   div.innerHTML=html;
+}
+
+function addAvaliacao(){
+  const mat=document.getElementById('nt-mat').value;
+  const avalInput=document.getElementById('nt-aval');
+  const aval=avalInput.value.trim();
+  const msg=document.getElementById('nt-msg');
+  
+  if(!mat){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione uma matéria primeiro.';
+    return;
+  }
+  if(!aval){
+    msg.style.color='#ef4444';
+    msg.textContent='Digite o nome da avaliação.';
+    return;
+  }
+  if(currentEvaluations.includes(aval)){
+    msg.style.color='#ef4444';
+    msg.textContent='Esta avaliação já existe.';
+    return;
+  }
+  
+  currentEvaluations.push(aval);
+  avalInput.value='';
+  msg.textContent='';
+  
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  
+  // Salva temporariamente na memória os valores digitados para não perdê-los no re-render
+  alunos.forEach(([m])=>{
+    if(!dados.materias[mat].notas) dados.materias[mat].notas={};
+    if(!dados.materias[mat].notas[m]) dados.materias[mat].notas[m]={};
+    
+    currentEvaluations.forEach(av=>{
+      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
+      if(input){
+        const val=input.value.trim();
+        if(val===''){
+          delete dados.materias[mat].notas[m][av];
+        }else{
+          dados.materias[mat].notas[m][av]=parseFloat(val.replace(',','.'));
+        }
+      }
+    });
+  });
+  
+  renderNotasTable(alunos,mat);
+}
+
+function recalcStudentAverage(matricula){
+  const inputs=document.querySelectorAll(`input[data-student="${matricula}"]`);
+  let sum=0;
+  let count=0;
+  inputs.forEach(input=>{
+    const val=parseFloat(input.value.replace(',','.'));
+    if(!isNaN(val)){
+      sum+=val;
+      count++;
+    }
+  });
+  
+  const mediaBadge=document.getElementById(`media-${matricula}`);
+  if(count>0){
+    const media=sum/count;
+    mediaBadge.textContent=media.toFixed(2);
+    mediaBadge.className='media-badge '+(media>=6?'aprovado':'reprovado');
+  }else{
+    mediaBadge.textContent='—';
+    mediaBadge.className='media-badge none';
+  }
 }
 
 async function salvarNotas(){
   const mat=document.getElementById('nt-mat').value;
-  const aval=document.getElementById('nt-aval').value.trim();
-  if(!mat||!aval){document.getElementById('nt-msg').style.color='red';document.getElementById('nt-msg').textContent='Selecione a matéria e informe a avaliação.';return;}
+  const msg=document.getElementById('nt-msg');
+  
+  if(!mat){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione a matéria.';
+    return;
+  }
+  
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   const notas={};
-  alunos.forEach(([m])=>{const v=document.querySelector(`input[data-id="${m}"]`)?.value;if(v&&v!=='')notas[m]=v;});
-  if(!Object.keys(notas).length){document.getElementById('nt-msg').style.color='red';document.getElementById('nt-msg').textContent='Nenhuma nota informada.';return;}
-  const r=await api('/api/notas','POST',{materia:mat,avaliacao:aval,notas});
-  const msg=document.getElementById('nt-msg');
-  if(r.ok){msg.style.color='green';msg.textContent='Notas salvas!';await refresh();loadNotas();}
-  else{msg.style.color='red';msg.textContent=r.erro;}
+  
+  alunos.forEach(([m])=>{
+    notas[m]={};
+    currentEvaluations.forEach(av=>{
+      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
+      if(input){
+        const val=input.value.trim();
+        if(val!==''){
+          const numVal=parseFloat(val.replace(',','.'));
+          if(!isNaN(numVal)&&numVal>=0&&numVal<=10){
+            notas[m][av]=numVal;
+          }
+        }
+      }
+    });
+  });
+  
+  const r=await api('/api/notas','POST',{materia:mat,notas});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Notas salvas com sucesso!';
+    await refresh();
+    loadNotas();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro||'Erro ao salvar notas.';
+  }
 }
 
 function loadBoletim(){
@@ -238,7 +1052,10 @@ function loadBoletim(){
   const aluno=dados.alunos[mat];
   if(!aluno){div.innerHTML='';return;}
   const materias=aluno.materias||[];
-  if(!materias.length){div.innerHTML='<div class="card" style="color:#999;font-size:13px">Aluno sem matérias associadas.</div>';return;}
+  if(!materias.length){
+    div.innerHTML='<div class="card" style="color:#64748b; font-size:13px; text-align:center">Aluno sem matérias associadas.</div>';
+    return;
+  }
   let html='';
   materias.forEach(nome=>{
     const matDados=dados.materias[nome];
@@ -246,20 +1063,23 @@ function loadBoletim(){
     const avals=Object.keys(notasAluno).sort();
     const media=calcMedia(notasAluno);
     const ap=media!==null&&media>=6;
-    const cor=media===null?'#fff':(ap?'#d4edda':'#f8d7da');
-    html+=`<div class="card" style="background:${cor};margin-bottom:1rem">`;
-    html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
+    const badgeClass=media===null?'none':(ap?'aprovado':'reprovado');
+    const badgeText=media!==null?(ap?'Aprovado':'Reprovado')+' — Média: '+media.toFixed(2):'Sem notas';
+    
+    html+=`<div class="card boletim-card">`;
+    html+=`<div class="boletim-card-header">`;
     html+=`<strong>${nome}</strong>`;
-    if(media!==null){html+=`<span class="badge ${ap?'badge-ap':'badge-rep'}">${ap?'Aprovado':'Reprovado'} — Média: ${media.toFixed(2)}</span>`;}
-    else{html+=`<span class="badge">Sem notas</span>`;}
+    html+=`<span class="media-badge ${badgeClass}">${badgeText}</span>`;
     html+='</div>';
     if(avals.length){
-      html+='<table><thead><tr>';
-      avals.forEach(av=>{html+=`<th>${av}</th>`;});
+      html+='<div class="table-container"><table class="stripe"><thead><tr>';
+      avals.forEach(av=>{html+=`<th class="text-center">${av}</th>`;});
       html+='</tr></thead><tbody><tr>';
-      avals.forEach(av=>{html+=`<td>${notasAluno[av]}</td>`;});
-      html+='</tr></tbody></table>';
-    }else{html+='<span style="font-size:13px;color:#666">Nenhuma nota lançada.</span>';}
+      avals.forEach(av=>{html+=`<td class="text-center font-medium">${notasAluno[av]}</td>`;});
+      html+='</tr></tbody></table></div>';
+    }else{
+      html+='<div class="no-grades">Nenhuma nota lançada.</div>';
+    }
     html+='</div>';
   });
   div.innerHTML=html;
@@ -269,4 +1089,5 @@ document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('modal-editar').addEventListener('click',function(e){if(e.target===this)fecharModal();});
 refresh();
 </script>
-</body></html>
+</body>
+</html>

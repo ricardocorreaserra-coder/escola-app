@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, html, psycopg2, json, uuid
+import os, html, psycopg2, sqlite3, json, uuid
 from functools import wraps
 
 app = Flask(__name__)
@@ -8,11 +8,16 @@ SENHA = os.environ.get("APP_SENHA", "escola1234")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "escola_local.db")
+    return sqlite3.connect(db_path)
 
 def init_db():
-    with get_conn() as conn:
-        with conn.cursor() as c:
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        if DATABASE_URL:
             c.execute("""
                 CREATE TABLE IF NOT EXISTS dados (
                     id INTEGER PRIMARY KEY DEFAULT 1,
@@ -24,20 +29,48 @@ def init_db():
                 VALUES (1, '{"alunos": {}, "materias": {}}')
                 ON CONFLICT (id) DO NOTHING
             """)
-            conn.commit()
+        else:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS dados (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    conteudo TEXT NOT NULL
+                )
+            """)
+            c.execute("""
+                INSERT OR IGNORE INTO dados (id, conteudo)
+                VALUES (1, '{"alunos": {}, "materias": {}}')
+            """)
+        conn.commit()
+    finally:
+        c.close()
+        conn.close()
 
 def load():
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("SELECT conteudo FROM dados WHERE id = 1")
-            row = c.fetchone()
-            return row[0] if row else {"alunos": {}, "materias": {}}
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT conteudo FROM dados WHERE id = 1")
+        row = c.fetchone()
+        if not row:
+            return {"alunos": {}, "materias": {}}
+        val = row[0]
+        if isinstance(val, str):
+            return json.loads(val)
+        return val
+    finally:
+        c.close()
+        conn.close()
 
 def save(dados):
-    with get_conn() as conn:
-        with conn.cursor() as c:
-            c.execute("UPDATE dados SET conteudo = %s WHERE id = 1", [json.dumps(dados)])
-            conn.commit()
+    placeholder = "%s" if DATABASE_URL else "?"
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute(f"UPDATE dados SET conteudo = {placeholder} WHERE id = 1", [json.dumps(dados)])
+        conn.commit()
+    finally:
+        c.close()
+        conn.close()
 
 def sanitize(text):
     return html.escape(str(text).strip())[:100]
@@ -200,23 +233,43 @@ def salvar_notas():
     d = load()
     body = request.json
     materia = sanitize(body.get("materia", ""))
-    aval = sanitize(body.get("avaliacao", ""))
-    notas = body.get("notas", {})
     if materia not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
-    reg = d["materias"][materia].setdefault("notas", {})
-    for mat, val in notas.items():
-        try:
-            n = float(str(val).replace(",", "."))
-            if not (0 <= n <= 10):
-                raise ValueError
-            reg.setdefault(sanitize(mat), {})[aval] = n
-        except (ValueError, TypeError):
-            pass
+    
+    input_notas = body.get("notas", {})
+    if not isinstance(input_notas, dict):
+        return jsonify({"erro": "Dados inválidos."}), 400
+        
+    sanitized_notas = {}
+    for mat_aluno, evals in input_notas.items():
+        mat_aluno = sanitize(mat_aluno)
+        if mat_aluno not in d["alunos"]:
+            continue
+        if not isinstance(evals, dict):
+            continue
+            
+        aluno_grades = {}
+        for aval, val in evals.items():
+            aval = sanitize(aval)
+            if not aval:
+                continue
+            if val is None or val == "":
+                continue
+            try:
+                n = float(str(val).replace(",", "."))
+                if 0 <= n <= 10:
+                    aluno_grades[aval] = n
+            except (ValueError, TypeError):
+                pass
+        if aluno_grades:
+            sanitized_notas[mat_aluno] = aluno_grades
+            
+    d["materias"][materia]["notas"] = sanitized_notas
     save(d)
     return jsonify({"ok": True})
 
 init_db()
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, port=port)
