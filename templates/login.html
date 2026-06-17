@@ -98,7 +98,8 @@ button:active {
   <p class="subtitle">Faça login para gerenciar sua escola</p>
   {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
   <form method="POST">
-    <input type="password" name="senha" placeholder="Senha de acesso" autofocus required>
+    <input type="text" name="usuario" placeholder="Nome de usuário" autofocus required>
+    <input type="password" name="senha" placeholder="Senha de acesso" required>
     <button type="submit">Entrar</button>
   </form>
 </div>

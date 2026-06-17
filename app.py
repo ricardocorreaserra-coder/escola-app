@@ -1,17 +1,83 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, html, psycopg2, sqlite3, json, uuid
+import os, html, psycopg2, sqlite3, json, uuid, time
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
 SENHA = os.environ.get("APP_SENHA", "escola1234")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Configurações de cookies de sessão seguros
+app.config.update(
+    SESSION_COOKIE_SECURE=DATABASE_URL is not None,  # Apenas envia via HTTPS em produção
+    SESSION_COOKIE_HTTPONLY=True,                     # Impede acesso JavaScript ao cookie
+    SESSION_COOKIE_SAMESITE='Lax',                    # Protege contra CSRF
+)
+
+# Limitador de tentativas de login por IP (Anti-Brute Force)
+LOGIN_LIMIT = 5
+BLOCK_TIME = 300  # 5 minutos
+failed_attempts = {}  # ip -> {"count": int, "blocked_until": float}
+
+def check_rate_limit(ip):
+    now = time.time()
+    if ip in failed_attempts:
+        record = failed_attempts[ip]
+        if record["blocked_until"] > now:
+            remaining = int(record["blocked_until"] - now)
+            return False, f"Muitas tentativas falhas. Tente novamente em {remaining} segundos."
+        elif record["count"] >= LOGIN_LIMIT:
+            failed_attempts[ip] = {"count": 0, "blocked_until": 0.0}
+    return True, ""
+
+def register_login_failure(ip):
+    now = time.time()
+    if ip not in failed_attempts:
+        failed_attempts[ip] = {"count": 0, "blocked_until": 0.0}
+    
+    failed_attempts[ip]["count"] += 1
+    if failed_attempts[ip]["count"] >= LOGIN_LIMIT:
+        failed_attempts[ip]["blocked_until"] = now + BLOCK_TIME
+
+def reset_login_attempts(ip):
+    if ip in failed_attempts:
+        del failed_attempts[ip]
+
+# Cabeçalhos de Segurança HTTP
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "img-src 'self' data:;"
+    )
+    return response
+
 def get_conn():
     if DATABASE_URL:
         return psycopg2.connect(DATABASE_URL)
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "escola_local.db")
     return sqlite3.connect(db_path)
+
+def bootstrap_admin():
+    d = load()
+    if "usuarios" not in d:
+        d["usuarios"] = {}
+    
+    if not d["usuarios"]:
+        admin_pass = os.environ.get("APP_SENHA", "escola1234")
+        d["usuarios"]["admin"] = {
+            "usuario": "admin",
+            "nome": "Administrador",
+            "senha_hash": generate_password_hash(admin_pass)
+        }
+        save(d)
+        print("Usuário inicial 'admin' criado com sucesso.")
 
 def init_db():
     conn = get_conn()
@@ -26,7 +92,7 @@ def init_db():
             """)
             c.execute("""
                 INSERT INTO dados (id, conteudo)
-                VALUES (1, '{"alunos": {}, "materias": {}}')
+                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}}')
                 ON CONFLICT (id) DO NOTHING
             """)
         else:
@@ -38,12 +104,13 @@ def init_db():
             """)
             c.execute("""
                 INSERT OR IGNORE INTO dados (id, conteudo)
-                VALUES (1, '{"alunos": {}, "materias": {}}')
+                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}}')
             """)
         conn.commit()
     finally:
         c.close()
         conn.close()
+    bootstrap_admin()
 
 def load():
     conn = get_conn()
@@ -52,11 +119,15 @@ def load():
         c.execute("SELECT conteudo FROM dados WHERE id = 1")
         row = c.fetchone()
         if not row:
-            return {"alunos": {}, "materias": {}}
+            return {"alunos": {}, "materias": {}, "usuarios": {}}
         val = row[0]
         if isinstance(val, str):
-            return json.loads(val)
-        return val
+            d = json.loads(val)
+        else:
+            d = val
+        if "usuarios" not in d:
+            d["usuarios"] = {}
+        return d
     finally:
         c.close()
         conn.close()
@@ -87,10 +158,31 @@ def login_required(f):
 def login():
     erro = ""
     if request.method == "POST":
-        if request.form.get("senha", "") == SENHA:
-            session["logado"] = True
-            return redirect(url_for("index"))
-        erro = "Senha incorreta."
+        ip = request.remote_addr or "unknown"
+        allowed, reason = check_rate_limit(ip)
+        if not allowed:
+            return render_template("login.html", erro=reason)
+            
+        usuario = sanitize(request.form.get("usuario", ""))
+        senha = request.form.get("senha", "")
+        
+        if not usuario or not senha:
+            erro = "Usuário e senha são obrigatórios."
+            register_login_failure(ip)
+        else:
+            d = load()
+            user_data = d.get("usuarios", {}).get(usuario)
+            if user_data and check_password_hash(user_data["senha_hash"], senha):
+                session.clear()
+                session["logado"] = True
+                session["usuario"] = usuario
+                session["nome"] = user_data.get("nome", usuario)
+                reset_login_attempts(ip)
+                return redirect(url_for("index"))
+            else:
+                erro = "Usuário ou senha incorretos."
+                register_login_failure(ip)
+                
     return render_template("login.html", erro=erro)
 
 @app.route("/logout")
