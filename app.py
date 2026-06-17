@@ -5,14 +5,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
+
 SENHA = os.environ.get("APP_SENHA", "escola1234")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Configurações de cookies de sessão seguros
 app.config.update(
     SESSION_COOKIE_SECURE=DATABASE_URL is not None,  # Apenas envia via HTTPS em produção
-    SESSION_COOKIE_HTTPONLY=True,                     # Impede acesso JavaScript ao cookie
-    SESSION_COOKIE_SAMESITE='Lax',                    # Protege contra CSRF
+    SESSION_COOKIE_HTTPONLY=True,                    # Impede acesso JavaScript ao cookie
+    SESSION_COOKIE_SAMESITE='Lax',                  # Protege contra CSRF
 )
 
 # Limitador de tentativas de login por IP (Anti-Brute Force)
@@ -35,7 +36,6 @@ def register_login_failure(ip):
     now = time.time()
     if ip not in failed_attempts:
         failed_attempts[ip] = {"count": 0, "blocked_until": 0.0}
-    
     failed_attempts[ip]["count"] += 1
     if failed_attempts[ip]["count"] >= LOGIN_LIMIT:
         failed_attempts[ip]["blocked_until"] = now + BLOCK_TIME
@@ -52,6 +52,7 @@ def add_security_headers(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Content-Security-Policy'] = (
         "default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "  # CORRIGIDO: permite scripts inline
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data:;"
@@ -68,7 +69,6 @@ def bootstrap_admin():
     d = load()
     if "usuarios" not in d:
         d["usuarios"] = {}
-    
     if not d["usuarios"]:
         admin_pass = os.environ.get("APP_SENHA", "escola1234")
         d["usuarios"]["admin"] = {
@@ -162,10 +162,10 @@ def login():
         allowed, reason = check_rate_limit(ip)
         if not allowed:
             return render_template("login.html", erro=reason)
-            
+
         usuario = sanitize(request.form.get("usuario", ""))
         senha = request.form.get("senha", "")
-        
+
         if not usuario or not senha:
             erro = "Usuário e senha são obrigatórios."
             register_login_failure(ip)
@@ -182,7 +182,7 @@ def login():
             else:
                 erro = "Usuário ou senha incorretos."
                 register_login_failure(ip)
-                
+
     return render_template("login.html", erro=erro)
 
 @app.route("/logout")
@@ -327,11 +327,9 @@ def salvar_notas():
     materia = sanitize(body.get("materia", ""))
     if materia not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
-    
     input_notas = body.get("notas", {})
     if not isinstance(input_notas, dict):
         return jsonify({"erro": "Dados inválidos."}), 400
-        
     sanitized_notas = {}
     for mat_aluno, evals in input_notas.items():
         mat_aluno = sanitize(mat_aluno)
@@ -339,7 +337,6 @@ def salvar_notas():
             continue
         if not isinstance(evals, dict):
             continue
-            
         aluno_grades = {}
         for aval, val in evals.items():
             aval = sanitize(aval)
@@ -355,7 +352,6 @@ def salvar_notas():
                 pass
         if aluno_grades:
             sanitized_notas[mat_aluno] = aluno_grades
-            
     d["materias"][materia]["notas"] = sanitized_notas
     save(d)
     return jsonify({"ok": True})
