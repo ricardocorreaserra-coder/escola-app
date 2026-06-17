@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, html, psycopg2, json
+import os, html, psycopg2, json, uuid
 from functools import wraps
 
 app = Flask(__name__)
@@ -81,12 +81,14 @@ def get_dados():
 def add_aluno():
     d = load()
     body = request.json
-    mat = sanitize(body.get("matricula", ""))
     nome = sanitize(body.get("nome", ""))
-    if not mat or not nome:
-        return jsonify({"erro": "Matricula e nome são obrigatórios."}), 400
-    if mat in d["alunos"]:
-        return jsonify({"erro": "Matrícula já cadastrada."}), 400
+    if not nome:
+        return jsonify({"erro": "Nome é obrigatório."}), 400
+    if any(a["nome"].lower() == nome.lower() for a in d["alunos"].values()):
+        return jsonify({"erro": "Aluno já cadastrado."}), 400
+    mat = str(uuid.uuid4())[:8]
+    while mat in d["alunos"]:
+        mat = str(uuid.uuid4())[:8]
     d["alunos"][mat] = {"nome": nome, "materias": []}
     save(d)
     return jsonify({"ok": True})
