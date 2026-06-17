@@ -107,6 +107,22 @@ def del_aluno(matricula):
     save(d)
     return jsonify({"ok": True})
 
+@app.route("/api/alunos/<matricula>", methods=["PUT"])
+@login_required
+def edit_aluno(matricula):
+    d = load()
+    matricula = sanitize(matricula)
+    if matricula not in d["alunos"]:
+        return jsonify({"erro": "Aluno não encontrado."}), 404
+    nome = sanitize(request.json.get("nome", ""))
+    if not nome:
+        return jsonify({"erro": "Nome é obrigatório."}), 400
+    if any(a["nome"].lower() == nome.lower() and k != matricula for k, a in d["alunos"].items()):
+        return jsonify({"erro": "Já existe um aluno com esse nome."}), 400
+    d["alunos"][matricula]["nome"] = nome
+    save(d)
+    return jsonify({"ok": True})
+
 @app.route("/api/alunos/<matricula>/materias", methods=["POST"])
 @login_required
 def assoc_materia(matricula):
