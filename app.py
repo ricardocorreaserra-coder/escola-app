@@ -92,7 +92,7 @@ def init_db():
             """)
             c.execute("""
                 INSERT INTO dados (id, conteudo)
-                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}}')
+                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}, "turmas": {}}')
                 ON CONFLICT (id) DO NOTHING
             """)
         else:
@@ -104,7 +104,7 @@ def init_db():
             """)
             c.execute("""
                 INSERT OR IGNORE INTO dados (id, conteudo)
-                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}}')
+                VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}, "turmas": {}}')
             """)
         conn.commit()
     finally:
@@ -127,6 +127,8 @@ def load():
             d = val
         if "usuarios" not in d:
             d["usuarios"] = {}
+        if "turmas" not in d:
+            d["turmas"] = {}
         return d
     finally:
         c.close()
@@ -207,14 +209,17 @@ def add_aluno():
     d = load()
     body = request.json
     nome = sanitize(body.get("nome", ""))
+    turma = sanitize(body.get("turma", "")) if body.get("turma") else ""
     if not nome:
         return jsonify({"erro": "Nome é obrigatório."}), 400
     if any(a["nome"].lower() == nome.lower() for a in d["alunos"].values()):
         return jsonify({"erro": "Aluno já cadastrado."}), 400
+    if turma and turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
     mat = str(uuid.uuid4())[:8]
     while mat in d["alunos"]:
         mat = str(uuid.uuid4())[:8]
-    d["alunos"][mat] = {"nome": nome, "materias": []}
+    d["alunos"][mat] = {"nome": nome, "materias": [], "turma": turma}
     save(d)
     return jsonify({"ok": True})
 
@@ -239,12 +244,18 @@ def edit_aluno(matricula):
     matricula = sanitize(matricula)
     if matricula not in d["alunos"]:
         return jsonify({"erro": "Aluno não encontrado."}), 404
-    nome = sanitize(request.json.get("nome", ""))
+    body = request.json
+    nome = sanitize(body.get("nome", ""))
     if not nome:
         return jsonify({"erro": "Nome é obrigatório."}), 400
     if any(a["nome"].lower() == nome.lower() and k != matricula for k, a in d["alunos"].items()):
         return jsonify({"erro": "Já existe um aluno com esse nome."}), 400
     d["alunos"][matricula]["nome"] = nome
+    if "turma" in body:
+        turma = sanitize(body.get("turma", "")) if body.get("turma") else ""
+        if turma and turma not in d["turmas"]:
+            return jsonify({"erro": "Turma não encontrada."}), 404
+        d["alunos"][matricula]["turma"] = turma
     save(d)
     return jsonify({"ok": True})
 
@@ -300,6 +311,58 @@ def del_materia(nome):
     for aluno in d["alunos"].values():
         if nome in aluno.get("materias", []):
             aluno["materias"].remove(nome)
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/turmas", methods=["POST"])
+@login_required
+def add_turma():
+    d = load()
+    nome = sanitize(request.json.get("nome", ""))
+    if not nome:
+        return jsonify({"erro": "Nome da turma é obrigatório."}), 400
+    if nome in d["turmas"]:
+        return jsonify({"erro": "Turma já existe."}), 400
+    d["turmas"][nome] = {}
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/turmas/<nome>", methods=["DELETE"])
+@login_required
+def del_turma(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    del d["turmas"][nome]
+    for aluno in d["alunos"].values():
+        if aluno.get("turma") == nome:
+            aluno["turma"] = ""
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/alunos/<matricula>/turma", methods=["POST"])
+@login_required
+def assoc_turma(matricula):
+    d = load()
+    matricula = sanitize(matricula)
+    turma = sanitize(request.json.get("turma", ""))
+    if matricula not in d["alunos"]:
+        return jsonify({"erro": "Aluno não encontrado."}), 404
+    if turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    d["alunos"][matricula]["turma"] = turma
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/alunos/<matricula>/turma", methods=["DELETE"])
+@login_required
+def desassoc_turma(matricula):
+    d = load()
+    matricula = sanitize(matricula)
+    if matricula not in d["alunos"]:
+        return jsonify({"erro": "Aluno não encontrado."}), 404
+    d["alunos"][matricula]["turma"] = ""
     save(d)
     return jsonify({"ok": True})
 
