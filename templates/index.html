@@ -156,6 +156,46 @@ input:focus, select:focus {
   border-color: #0ea5e9;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
 }
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 90px;
+  resize: vertical;
+}
+textarea:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+.conteudo-item {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: #f8fafc;
+}
+.conteudo-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.conteudo-item-header strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+.conteudo-item-texto {
+  font-size: 13px;
+  color: #475569;
+  white-space: pre-wrap;
+}
 .btn {
   padding: 10px 20px;
   border-radius: 8px;
@@ -233,6 +273,29 @@ tr:last-child td {
   color: #475569;
   margin-right: 4px;
   margin-bottom: 4px;
+}
+tr.group-row td {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.group-header {
+  padding: 10px 16px;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+}
+.group-header:first-of-type {
+  border-top: none;
 }
 .btn-icon {
   background: none;
@@ -429,6 +492,7 @@ tr:last-child td {
     <button class="tab" onclick="showTab('chamada',this)">Chamada</button>
     <button class="tab" onclick="showTab('notas',this)">Notas</button>
     <button class="tab" onclick="showTab('boletim',this)">Boletim</button>
+    <button class="tab" onclick="showTab('diario',this)">Diário</button>
   </div>
 </div>
 
@@ -542,6 +606,30 @@ tr:last-child td {
           </tbody>
         </table>
       </div>
+    </div>
+    <div class="card">
+      <h3>Conteúdo lecionado</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Matéria</label>
+          <select id="cl-mat" onchange="renderConteudos()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group small">
+          <label>Data da aula</label>
+          <input type="date" id="cl-data">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="min-width:100%">
+          <label>Conteúdo lecionado</label>
+          <textarea id="cl-texto" placeholder="O que foi ensinado nesta aula..."></textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="salvarConteudo()"><i class="ti ti-plus"></i> Salvar</button>
+      <div class="msg" id="cl-msg"></div>
+      <div id="cl-lista" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -664,6 +752,54 @@ tr:last-child td {
     </div>
     <div id="bl-conteudo"></div>
   </div>
+
+  <!-- SEÇÃO: DIÁRIO -->
+  <div id="sec-diario" class="section">
+    <h2 class="section-title">Diário</h2>
+    <div class="card">
+      <h3>Logotipo da instituição</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Aparece no topo de todo Diário exportado. Aceita PNG ou JPG, até 2MB.
+      </p>
+      <div id="lg-preview" style="margin-bottom:12px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="file" id="lg-arquivo" accept="image/png,image/jpeg">
+        </div>
+        <button class="btn btn-primary" onclick="enviarLogo()"><i class="ti ti-upload"></i> Enviar logotipo</button>
+        <button class="btn btn-blue" id="lg-remover" onclick="removerLogo()" style="display:none"><i class="ti ti-trash"></i> Remover</button>
+      </div>
+      <div class="msg" id="lg-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Exportar Diário de Classe</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Gera uma planilha (.xlsx) com a lista de alunos, frequência, avaliações, médias e faltas da turma/matéria escolhida.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="dr-turma">
+            <option value="">Selecione a turma</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="dr-materia">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="dr-instituicao" placeholder="Instituição (opcional)">
+        </div>
+        <div class="form-group">
+          <input id="dr-curso" placeholder="Curso (opcional)">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="baixarDiario()"><i class="ti ti-download"></i> Baixar Diário (.xlsx)</button>
+      <div class="msg" id="dr-msg"></div>
+    </div>
+  </div>
 </main>
 
 <!-- MODAL EDITAR ALUNO -->
@@ -701,6 +837,8 @@ async function refresh(){
   renderMaterias();
   renderAssoc();
   populateSelects();
+  renderConteudos();
+  renderLogoPreview();
 }
 
 function showTab(id,el){
@@ -719,7 +857,45 @@ function calcMedia(notas){
 }
 
 function alunosOrdenados(){
-  return Object.entries(dados.alunos).sort((a,b)=>a[1].nome.localeCompare(b[1].nome,'pt-BR'));
+  return Object.entries(dados.alunos).sort((a,b)=>{
+    const ta=a[1].turma||'\uffff';
+    const tb=b[1].turma||'\uffff';
+    const cmpTurma=ta.localeCompare(tb,'pt-BR');
+    if(cmpTurma!==0) return cmpTurma;
+    return a[1].nome.localeCompare(b[1].nome,'pt-BR');
+  });
+}
+
+function turmaLabel(t){
+  return t?t:'Sem turma';
+}
+
+// Agrupa uma lista já ordenada de alunos por turma, chamando onGroup() ao iniciar
+// cada novo grupo e onItem() para cada aluno. Mantém a função de renderização
+// específica de cada tela (tabela, lista de checkboxes etc.) desacoplada do agrupamento.
+function agruparPorTurma(rows,onGroup,onItem){
+  let turmaAtual=null;
+  rows.forEach(([mat,a])=>{
+    const turmaAluno=a.turma||'';
+    if(turmaAluno!==turmaAtual){
+      turmaAtual=turmaAluno;
+      onGroup(turmaLabel(turmaAluno));
+    }
+    onItem(mat,a);
+  });
+}
+
+function linhaAluno(mat,a){
+  return `
+    <tr>
+      <td class="font-medium">${a.nome}</td>
+      <td>${a.turma?`<span class="badge">${a.turma}</span>`:'—'}</td>
+      <td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join('')||'—'}</td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        <button class="btn-icon btn-edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}','${(a.turma||'').replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
+        <button class="btn-icon btn-delete" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
 }
 
 function renderAlunos(){
@@ -731,17 +907,17 @@ function renderAlunos(){
     tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>';
     return;
   }
-  tb.innerHTML=rows.map(([mat,a])=>`
-    <tr>
-      <td class="font-medium">${a.nome}</td>
-      <td>${a.turma?`<span class="badge">${a.turma}</span>`:'—'}</td>
-      <td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join('')||'—'}</td>
-      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
-        <button class="btn-icon btn-edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}','${(a.turma||'').replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
-        <button class="btn-icon btn-delete" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button>
-      </td>
-    </tr>
-  `).join('');
+  let html='';
+  if(filtro){
+    // Já filtrado por uma única turma: cabeçalho de grupo seria redundante
+    rows.forEach(([mat,a])=>{ html+=linhaAluno(mat,a); });
+  }else{
+    agruparPorTurma(rows,
+      (label)=>{ html+=`<tr class="group-row"><td colspan="4">${label}</td></tr>`; },
+      (mat,a)=>{ html+=linhaAluno(mat,a); }
+    );
+  }
+  tb.innerHTML=html;
 }
 
 function renderTurmas(){
@@ -801,6 +977,15 @@ function renderAssoc(){
   `).join('');
 }
 
+function opcoesAlunosAgrupadas(alunos){
+  let html='';
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<optgroup label="${label}">`; },
+    (mat,a)=>{ html+=`<option value="${mat}">${a.nome}</option>`; }
+  );
+  return html;
+}
+
 function populateSelects(){
   const alunos=alunosOrdenados();
   const mats=Object.keys(dados.materias);
@@ -808,10 +993,10 @@ function populateSelects(){
   ['as-aluno','bl-aluno','att-aluno'].forEach(id=>{
     const s=document.getElementById(id);
     const v=s.value;
-    s.innerHTML='<option value="">Selecione o aluno</option>'+alunos.map(([m,a])=>`<option value="${m}">${a.nome}</option>`).join('');
+    s.innerHTML='<option value="">Selecione o aluno</option>'+opcoesAlunosAgrupadas(alunos);
     s.value=v;
   });
-  ['as-mat','ch-mat','nt-mat'].forEach(id=>{
+  ['as-mat','ch-mat','nt-mat','dr-materia','cl-mat'].forEach(id=>{
     const s=document.getElementById(id);
     const v=s.value;
     s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');
@@ -831,6 +1016,11 @@ function populateSelects(){
   const v3=ts.value;
   ts.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   ts.value=v3;
+
+  const drs=document.getElementById('dr-turma');
+  const v4=drs.value;
+  drs.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  drs.value=v4;
 }
 
 function abrirModal(id,nome,turma){
@@ -951,6 +1141,64 @@ async function delMateria(nome){
   refresh();
 }
 
+function _fmtDataBR(data){
+  const [y,m,dia]=data.split('-');
+  return `${dia}/${m}/${y}`;
+}
+
+function renderConteudos(){
+  const materia=document.getElementById('cl-mat')?.value;
+  const div=document.getElementById('cl-lista');
+  if(!div) return;
+  if(!materia){
+    div.innerHTML='';
+    return;
+  }
+  const conteudos=dados.materias[materia]?.conteudos||{};
+  const entradas=Object.entries(conteudos).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entradas.length){
+    div.innerHTML='<div style="color:#94a3b8; font-size:13px; text-align:center; padding:1rem">Nenhum conteúdo registrado ainda para esta matéria.</div>';
+    return;
+  }
+  div.innerHTML=entradas.map(([data,texto])=>`
+    <div class="conteudo-item">
+      <div class="conteudo-item-header">
+        <strong>${_fmtDataBR(data)}</strong>
+        <button class="btn-icon btn-delete" onclick="delConteudo('${materia}','${data}')"><i class="ti ti-trash"></i></button>
+      </div>
+      <div class="conteudo-item-texto">${texto}</div>
+    </div>
+  `).join('');
+}
+
+async function salvarConteudo(){
+  const materia=document.getElementById('cl-mat').value;
+  const data=document.getElementById('cl-data').value;
+  const texto=document.getElementById('cl-texto').value.trim();
+  const msg=document.getElementById('cl-msg');
+  if(!materia||!data||!texto){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione a matéria, a data e descreva o conteúdo.';
+    return;
+  }
+  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{data,conteudo:texto});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Conteúdo salvo com sucesso!';
+    document.getElementById('cl-texto').value='';
+    await refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delConteudo(materia,data){
+  if(!confirm('Excluir este registro de conteúdo lecionado?'))return;
+  await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo/'+encodeURIComponent(data),'DELETE');
+  await refresh();
+}
+
 async function assoc(){
   const mat=document.getElementById('as-aluno').value;
   const materia=document.getElementById('as-mat').value;
@@ -988,12 +1236,18 @@ function loadChamada(){
     div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
     return;
   }
-  div.innerHTML=alunos.map(([m,a])=>`
+  let html='';
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<div class="group-header">${label}</div>`; },
+    (m,a)=>{
+      html+=`
     <div class="check-row">
       <input type="checkbox" id="ch-${m}" checked>
       <label for="ch-${m}">${a.nome}</label>
-    </div>
-  `).join('');
+    </div>`;
+    }
+  );
+  div.innerHTML=html;
 }
 
 async function salvarChamada(){
@@ -1061,23 +1315,27 @@ function renderNotasTable(alunos,mat){
     html+=`<th class="text-center">${av}</th>`;
   });
   html+='<th class="text-center">Média</th></tr></thead><tbody>';
-  
-  alunos.forEach(([m,a])=>{
-    const notasAluno=dados.materias[mat]?.notas?.[m]||{};
-    
-    html+=`<tr><td class="font-medium" style="color: #334155;">${a.nome}</td>`;
-    
-    currentEvaluations.forEach(av=>{
-      const val=notasAluno[av]!==undefined?notasAluno[av]:'';
-      html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
-    });
-    
-    const media=calcMedia(notasAluno);
-    const badgeClass=media===null?'none':(media>=6?'aprovado':'reprovado');
-    const mediaText=media!==null?media.toFixed(2):'—';
-    
-    html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td></tr>`;
-  });
+  const colspanGrupo=currentEvaluations.length+2;
+
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<tr class="group-row"><td colspan="${colspanGrupo}">${label}</td></tr>`; },
+    (m,a)=>{
+      const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+
+      html+=`<tr><td class="font-medium" style="color: #334155;">${a.nome}</td>`;
+
+      currentEvaluations.forEach(av=>{
+        const val=notasAluno[av]!==undefined?notasAluno[av]:'';
+        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
+      });
+
+      const media=calcMedia(notasAluno);
+      const badgeClass=media===null?'none':(media>=6?'aprovado':'reprovado');
+      const mediaText=media!==null?media.toFixed(2):'—';
+
+      html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td></tr>`;
+    }
+  );
   
   html+='</tbody></table></div>';
   html+=`<div class="table-footer"><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
@@ -1204,12 +1462,13 @@ function loadBoletim(){
   if(!mat){div.innerHTML='';return;}
   const aluno=dados.alunos[mat];
   if(!aluno){div.innerHTML='';return;}
+  const turmaHtml=`<div style="margin-bottom:1rem"><span class="badge">Turma: ${turmaLabel(aluno.turma)}</span></div>`;
   const materias=aluno.materias||[];
   if(!materias.length){
-    div.innerHTML='<div class="card" style="color:#64748b; font-size:13px; text-align:center">Aluno sem matérias associadas.</div>';
+    div.innerHTML=turmaHtml+'<div class="card" style="color:#64748b; font-size:13px; text-align:center">Aluno sem matérias associadas.</div>';
     return;
   }
-  let html='';
+  let html=turmaHtml;
   materias.forEach(nome=>{
     const matDados=dados.materias[nome];
     const notasAluno=matDados?.notas?.[mat]||{};
@@ -1239,7 +1498,77 @@ function loadBoletim(){
 }
 
 document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
+document.getElementById('cl-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('modal-editar').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+
+function baixarDiario(){
+  const turma=document.getElementById('dr-turma').value;
+  const materia=document.getElementById('dr-materia').value;
+  const instituicao=document.getElementById('dr-instituicao').value.trim();
+  const curso=document.getElementById('dr-curso').value.trim();
+  const msg=document.getElementById('dr-msg');
+  if(!turma||!materia){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione turma e matéria.';
+    return;
+  }
+  msg.style.color='#10b981';
+  msg.textContent='Gerando arquivo...';
+  const params=new URLSearchParams({turma,materia,instituicao,curso});
+  window.location.href='/api/diario?'+params.toString();
+  setTimeout(()=>{ msg.textContent=''; },2000);
+}
+
+function renderLogoPreview(){
+  const div=document.getElementById('lg-preview');
+  const btnRemover=document.getElementById('lg-remover');
+  if(!div) return;
+  const cfg=dados.config||{};
+  if(cfg.logo_b64){
+    div.innerHTML=`<img src="data:${cfg.logo_mime};base64,${cfg.logo_b64}" style="max-height:60px; border:1px solid #e2e8f0; border-radius:6px; padding:4px; display:block">`;
+    if(btnRemover) btnRemover.style.display='inline-flex';
+  }else{
+    div.innerHTML='<span style="font-size:13px; color:#94a3b8">Nenhum logotipo enviado ainda.</span>';
+    if(btnRemover) btnRemover.style.display='none';
+  }
+}
+
+async function enviarLogo(){
+  const input=document.getElementById('lg-arquivo');
+  const msg=document.getElementById('lg-msg');
+  const file=input.files[0];
+  if(!file){
+    msg.style.color='#ef4444';
+    msg.textContent='Escolha uma imagem PNG ou JPG.';
+    return;
+  }
+  if(file.size>2*1024*1024){
+    msg.style.color='#ef4444';
+    msg.textContent='Imagem muito grande (máx. 2MB).';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=async function(){
+    const r=await api('/api/logo','POST',{imagem:reader.result});
+    if(r.ok){
+      msg.style.color='#10b981';
+      msg.textContent='Logotipo salvo com sucesso!';
+      input.value='';
+      await refresh();
+    }else{
+      msg.style.color='#ef4444';
+      msg.textContent=r.erro;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function removerLogo(){
+  if(!confirm('Remover o logotipo do Diário?'))return;
+  await api('/api/logo','DELETE');
+  await refresh();
+}
+
 refresh();
 </script>
 </body>
