@@ -494,6 +494,7 @@ tr.group-row td {
     <button class="tab" onclick="showTab('notas',this)">Notas</button>
     <button class="tab" onclick="showTab('boletim',this)">Boletim</button>
     <button class="tab" onclick="showTab('diario',this)">Diário</button>
+    <button class="tab" onclick="showTab('backup',this)">Backup</button>
   </div>
 </div>
 
@@ -799,6 +800,31 @@ tr.group-row td {
       </div>
       <button class="btn btn-primary" onclick="baixarDiario()"><i class="ti ti-download"></i> Baixar Diário (.xlsx)</button>
       <div class="msg" id="dr-msg"></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: BACKUP -->
+  <div id="sec-backup" class="section">
+    <h2 class="section-title">Backup</h2>
+    <div class="card">
+      <h3>Exportar backup</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Gera um arquivo (.json) com todos os dados do sistema: alunos, turmas, matérias, chamadas, notas, conteúdos lecionados e logotipo. Guarde esse arquivo em local seguro — ele também contém as credenciais de acesso (de forma protegida).
+      </p>
+      <button class="btn btn-primary" onclick="baixarBackup()"><i class="ti ti-download"></i> Baixar backup (.json)</button>
+    </div>
+    <div class="card">
+      <h3>Restaurar backup</h3>
+      <p style="font-size:13px; color:#ef4444; margin-bottom:14px">
+        <strong>Atenção:</strong> restaurar um backup substitui TODOS os dados atuais (alunos, turmas, notas, chamadas etc.) pelo que estiver salvo no arquivo. Essa ação não pode ser desfeita.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="file" id="bk-arquivo" accept="application/json,.json">
+        </div>
+        <button class="btn btn-blue" onclick="restaurarBackup()"><i class="ti ti-upload"></i> Restaurar backup</button>
+      </div>
+      <div class="msg" id="bk-msg"></div>
     </div>
   </div>
 </main>
@@ -1626,6 +1652,46 @@ async function removerLogo(){
   if(!confirm('Remover o logotipo do Diário?'))return;
   await api('/api/logo','DELETE');
   await refresh();
+}
+
+function baixarBackup(){
+  window.location.href='/api/backup';
+}
+
+async function restaurarBackup(){
+  const input=document.getElementById('bk-arquivo');
+  const msg=document.getElementById('bk-msg');
+  const file=input.files[0];
+  if(!file){
+    msg.style.color='#ef4444';
+    msg.textContent='Escolha um arquivo de backup (.json).';
+    return;
+  }
+  if(!confirm('Tem certeza? Isso vai substituir TODOS os dados atuais pelos do arquivo de backup. Essa ação não pode ser desfeita.')){
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=async function(){
+    let dadosBackup;
+    try{
+      dadosBackup=JSON.parse(reader.result);
+    }catch(e){
+      msg.style.color='#ef4444';
+      msg.textContent='Esse arquivo não é um JSON válido.';
+      return;
+    }
+    const r=await api('/api/backup/restaurar','POST',{dados:dadosBackup});
+    if(r.ok){
+      msg.style.color='#10b981';
+      msg.textContent='Backup restaurado com sucesso! Atualizando...';
+      input.value='';
+      await refresh();
+    }else{
+      msg.style.color='#ef4444';
+      msg.textContent=r.erro;
+    }
+  };
+  reader.readAsText(file);
 }
 
 refresh();
