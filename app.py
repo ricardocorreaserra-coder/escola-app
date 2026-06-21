@@ -212,7 +212,9 @@ def index():
 @app.route("/api/dados")
 @login_required
 def get_dados():
-    return jsonify(load())
+    d = load()
+    d.pop("usuarios", None)  # nunca expor hashes de senha ao frontend
+    return jsonify(d)
 
 @app.route("/api/alunos", methods=["POST"])
 @login_required
