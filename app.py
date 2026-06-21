@@ -1,7 +1,13 @@
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-import os, html, psycopg2, sqlite3, json, uuid, time
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
+import os, html, psycopg2, sqlite3, json, uuid, time, datetime, base64, re
+from io import BytesIO
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.drawing.image import Image as XLImage
+from PIL import Image as PILImage
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
@@ -129,6 +135,8 @@ def load():
             d["usuarios"] = {}
         if "turmas" not in d:
             d["turmas"] = {}
+        if "config" not in d:
+            d["config"] = {}
         return d
     finally:
         c.close()
@@ -147,6 +155,9 @@ def save(dados):
 
 def sanitize(text):
     return html.escape(str(text).strip())[:100]
+
+def sanitize_long(text, max_len=2000):
+    return html.escape(str(text).strip())[:max_len]
 
 def login_required(f):
     @wraps(f)
@@ -296,7 +307,7 @@ def add_materia():
         return jsonify({"erro": "Nome da matéria é obrigatório."}), 400
     if nome in d["materias"]:
         return jsonify({"erro": "Matéria já existe."}), 400
-    d["materias"][nome] = {"professor": prof, "chamadas": {}, "notas": {}}
+    d["materias"][nome] = {"professor": prof, "chamadas": {}, "notas": {}, "conteudos": {}}
     save(d)
     return jsonify({"ok": True})
 
@@ -311,6 +322,65 @@ def del_materia(nome):
     for aluno in d["alunos"].values():
         if nome in aluno.get("materias", []):
             aluno["materias"].remove(nome)
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/materias/<nome>/conteudo", methods=["POST"])
+@login_required
+def add_conteudo(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    data = sanitize(request.json.get("data", ""))
+    conteudo = sanitize_long(request.json.get("conteudo", ""))
+    if not data:
+        return jsonify({"erro": "Informe a data da aula."}), 400
+    if not conteudo:
+        return jsonify({"erro": "Descreva o conteúdo lecionado."}), 400
+    d["materias"][nome].setdefault("conteudos", {})[data] = conteudo
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/materias/<nome>/conteudo/<data>", methods=["DELETE"])
+@login_required
+def del_conteudo(nome, data):
+    d = load()
+    nome = sanitize(nome)
+    data = sanitize(data)
+    if nome in d["materias"]:
+        d["materias"][nome].setdefault("conteudos", {}).pop(data, None)
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/logo", methods=["POST"])
+@login_required
+def upload_logo():
+    d = load()
+    imagem = (request.json or {}).get("imagem", "")
+    m = re.match(r"^data:(image/(?:png|jpeg|jpg));base64,([A-Za-z0-9+/=]+)$", imagem)
+    if not m:
+        return jsonify({"erro": "Envie uma imagem PNG ou JPG válida."}), 400
+    mime, b64data = m.group(1), m.group(2)
+    if len(b64data) > 3_000_000:
+        return jsonify({"erro": "Imagem muito grande. Use um arquivo de até 2MB."}), 400
+    try:
+        PILImage.open(BytesIO(base64.b64decode(b64data))).verify()
+    except Exception:
+        return jsonify({"erro": "Não foi possível ler essa imagem."}), 400
+    d.setdefault("config", {})
+    d["config"]["logo_mime"] = mime
+    d["config"]["logo_b64"] = b64data
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/logo", methods=["DELETE"])
+@login_required
+def remover_logo():
+    d = load()
+    d.setdefault("config", {})
+    d["config"].pop("logo_b64", None)
+    d["config"].pop("logo_mime", None)
     save(d)
     return jsonify({"ok": True})
 
@@ -418,6 +488,228 @@ def salvar_notas():
     d["materias"][materia]["notas"] = sanitized_notas
     save(d)
     return jsonify({"ok": True})
+
+def _fmt_data(data_str, fmt="%d/%m"):
+    try:
+        return datetime.datetime.strptime(data_str, "%Y-%m-%d").strftime(fmt)
+    except (ValueError, TypeError):
+        return data_str
+
+def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, alunos, datas, chamadas, avals, notas, conteudos, logo_bytes=None):
+    bold = Font(bold=True)
+    title_font = Font(bold=True, size=14)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin = Side(style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="E2E8F0")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "FRENTE"
+
+    xl_logo = None
+    col_offset = 0
+    if logo_bytes:
+        try:
+            pil_img = PILImage.open(BytesIO(logo_bytes))
+            largura, altura = pil_img.size
+            altura_alvo = 70
+            largura_alvo = max(1, int(largura * (altura_alvo / altura)))
+            xl_logo = XLImage(BytesIO(logo_bytes))
+            xl_logo.height = altura_alvo
+            xl_logo.width = largura_alvo
+            col_offset = 2
+        except Exception:
+            xl_logo = None
+            col_offset = 0
+
+    n_datas = len(datas)
+    n_avals = len(avals)
+    COL_NUM, COL_ALUNO = 1, 2
+    col_first_data = 3
+    col_first_aval = col_first_data + n_datas
+    col_media = col_first_aval + n_avals
+    col_faltas = col_media + 1
+    total_cols = max(col_faltas, 5 + col_offset)
+
+    title_start_col = 1 + col_offset
+    ws.merge_cells(start_row=1, start_column=title_start_col, end_row=1, end_column=total_cols)
+    c = ws.cell(1, title_start_col, "DIÁRIO DE CLASSE")
+    c.font = title_font
+    c.alignment = center
+
+    rotulos = [(2, 1 + col_offset, "Instituição:", 2 + col_offset, instituicao or "—"), (2, 4 + col_offset, "Curso:", 5 + col_offset, curso or "—"),
+               (3, 1 + col_offset, "Disciplina:", 2 + col_offset, materia), (3, 4 + col_offset, "Professor(a):", 5 + col_offset, professor or "—"),
+               (4, 1 + col_offset, "Turma:", 2 + col_offset, turma), (4, 4 + col_offset, "Ano:", 5 + col_offset, str(ano))]
+    for r, c1, label, c2, valor in rotulos:
+        ws.cell(r, c1, label).font = bold
+        ws.cell(r, c2, valor)
+
+    label_secao = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    header_row = 6
+    if n_datas:
+        ws.merge_cells(start_row=header_row - 1, start_column=col_first_data, end_row=header_row - 1, end_column=col_first_data + n_datas - 1)
+        c = ws.cell(header_row - 1, col_first_data, "FREQUÊNCIA")
+        c.font = bold
+        c.alignment = label_secao
+        c.fill = header_fill
+    if n_avals:
+        ws.merge_cells(start_row=header_row - 1, start_column=col_first_aval, end_row=header_row - 1, end_column=col_first_aval + n_avals - 1)
+        c = ws.cell(header_row - 1, col_first_aval, "AVALIAÇÕES")
+        c.font = bold
+        c.alignment = label_secao
+        c.fill = header_fill
+
+    ws.cell(header_row, COL_NUM, "Nº").font = bold
+    ws.cell(header_row, COL_ALUNO, "Aluno").font = bold
+    for i, data in enumerate(datas):
+        cell = ws.cell(header_row, col_first_data + i, _fmt_data(data))
+        cell.font = bold
+        cell.alignment = center
+    for i, av in enumerate(avals):
+        cell = ws.cell(header_row, col_first_aval + i, av)
+        cell.font = bold
+        cell.alignment = center
+    ws.cell(header_row, col_media, "Média").font = bold
+    ws.cell(header_row, col_faltas, "Faltas").font = bold
+    for col in range(1, col_faltas + 1):
+        ws.cell(header_row, col).fill = header_fill
+        ws.cell(header_row, col).border = border
+        ws.cell(header_row, col).alignment = center
+
+    row = header_row + 1
+    for idx, (mat, a) in enumerate(alunos, start=1):
+        ws.cell(row, COL_NUM, idx).alignment = center
+        ws.cell(row, COL_ALUNO, a["nome"])
+        chamadas_aluno = chamadas.get(mat, {})
+        faltas = 0
+        for i, data in enumerate(datas):
+            presente = chamadas_aluno.get(data)
+            if presente is True:
+                val = "P"
+            elif presente is False:
+                val = "F"
+                faltas += 1
+            else:
+                val = ""
+            ws.cell(row, col_first_data + i, val).alignment = center
+        notas_aluno = notas.get(mat, {})
+        vals = []
+        for i, av in enumerate(avals):
+            v = notas_aluno.get(av)
+            ws.cell(row, col_first_aval + i, v if v is not None else "").alignment = center
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        media = round(sum(vals) / len(vals), 2) if vals else ""
+        ws.cell(row, col_media, media).alignment = center
+        ws.cell(row, col_faltas, faltas).alignment = center
+        for col in range(1, col_faltas + 1):
+            ws.cell(row, col).border = border
+        row += 1
+
+    if n_datas:
+        nota = ws.cell(row + 1, 1, "Legenda: P = presente   F = falta")
+        nota.font = Font(italic=True, size=9, color="64748B")
+
+    ws.column_dimensions[get_column_letter(COL_NUM)].width = 5
+    ws.column_dimensions[get_column_letter(COL_ALUNO)].width = 28
+    for i in range(n_datas):
+        ws.column_dimensions[get_column_letter(col_first_data + i)].width = 5
+    for i in range(n_avals):
+        ws.column_dimensions[get_column_letter(col_first_aval + i)].width = 9
+    ws.column_dimensions[get_column_letter(col_media)].width = 9
+    ws.column_dimensions[get_column_letter(col_faltas)].width = 9
+    ws.freeze_panes = ws.cell(header_row + 1, col_first_data)
+
+    if xl_logo:
+        ws.add_image(xl_logo, "A1")
+
+    ws2 = wb.create_sheet("VERSO")
+    ws2.merge_cells("A1:F1")
+    c = ws2.cell(1, 1, "LANÇAMENTO DA MATÉRIA LECIONADA")
+    c.font = title_font
+    c.alignment = center
+
+    ws2.cell(3, 1, "Data").font = bold
+    ws2.cell(3, 2, "Conteúdo lecionado").font = bold
+    ws2.merge_cells(start_row=3, start_column=2, end_row=3, end_column=6)
+    for col in range(1, 7):
+        ws2.cell(3, col).fill = header_fill
+        ws2.cell(3, col).border = border
+
+    r = 4
+    for data in datas:
+        ws2.cell(r, 1, _fmt_data(data, "%d/%m/%Y")).alignment = center
+        ws2.cell(r, 2, conteudos.get(data, ""))
+        ws2.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)
+        for col in range(1, 7):
+            ws2.cell(r, col).border = border
+        r += 1
+    if not datas:
+        r += 1
+
+    r += 2
+    ws2.cell(r, 1, "RESUMO DO BIMESTRE").font = bold
+    r += 1
+    ws2.cell(r, 1, "Aulas previstas:").font = bold
+    r += 1
+    ws2.cell(r, 1, "Aulas dadas:").font = bold
+    ws2.cell(r, 3, len(datas))
+    r += 1
+    ws2.cell(r, 1, "Encerrado em:").font = bold
+    r += 2
+    ws2.cell(r, 1, "Professor(a):").font = bold
+    ws2.cell(r, 3, professor or "")
+
+    ws2.column_dimensions["A"].width = 18
+    for col in "BCDEF":
+        ws2.column_dimensions[col].width = 14
+
+    return wb
+
+@app.route("/api/diario", methods=["GET"])
+@login_required
+def gerar_diario():
+    d = load()
+    turma = sanitize(request.args.get("turma", ""))
+    materia = sanitize(request.args.get("materia", ""))
+    instituicao = sanitize(request.args.get("instituicao", ""))
+    curso = sanitize(request.args.get("curso", ""))
+
+    if materia not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    if not turma or turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+
+    alunos = [(mat, a) for mat, a in d["alunos"].items()
+              if materia in a.get("materias", []) and a.get("turma", "") == turma]
+    alunos.sort(key=lambda x: x[1]["nome"])
+
+    mat_dados = d["materias"][materia]
+    chamadas = mat_dados.get("chamadas", {})
+    notas = mat_dados.get("notas", {})
+    conteudos = mat_dados.get("conteudos", {})
+    datas_chamada = {data for reg in chamadas.values() for data in reg.keys()}
+    datas = sorted(datas_chamada | set(conteudos.keys()))
+    avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
+    ano = datetime.datetime.now().year
+
+    logo_bytes = None
+    logo_b64 = d.get("config", {}).get("logo_b64")
+    if logo_b64:
+        try:
+            logo_bytes = base64.b64decode(logo_b64)
+        except Exception:
+            logo_bytes = None
+
+    wb = gerar_diario_workbook(instituicao, curso, materia, mat_dados.get("professor", ""), turma, ano, alunos, datas, chamadas, avals, notas, conteudos, logo_bytes)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    nome_arquivo = f"Diario_{turma}_{materia}.xlsx".replace(" ", "_")
+    return send_file(buf, as_attachment=True, download_name=nome_arquivo,
+                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 init_db()
 
