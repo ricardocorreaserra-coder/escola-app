@@ -355,6 +355,28 @@ def del_conteudo(nome, data):
     save(d)
     return jsonify({"ok": True})
 
+@app.route("/api/trocar-senha", methods=["POST"])
+@login_required
+def trocar_senha():
+    d = load()
+    usuario = session.get("usuario")
+    user_data = d.get("usuarios", {}).get(usuario)
+    if not user_data:
+        return jsonify({"erro": "Usuário não encontrado."}), 404
+
+    body = request.json or {}
+    senha_atual = body.get("senha_atual", "")
+    nova_senha = body.get("nova_senha", "")
+
+    if not check_password_hash(user_data["senha_hash"], senha_atual):
+        return jsonify({"erro": "Senha atual incorreta."}), 400
+    if len(nova_senha) < 6:
+        return jsonify({"erro": "A nova senha deve ter pelo menos 6 caracteres."}), 400
+
+    d["usuarios"][usuario]["senha_hash"] = generate_password_hash(nova_senha)
+    save(d)
+    return jsonify({"ok": True})
+
 @app.route("/api/logo", methods=["POST"])
 @login_required
 def upload_logo():
