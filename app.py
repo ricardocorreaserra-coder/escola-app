@@ -735,6 +735,36 @@ def gerar_diario():
     return send_file(buf, as_attachment=True, download_name=nome_arquivo,
                       mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+@app.route("/api/backup", methods=["GET"])
+@login_required
+def exportar_backup():
+    d = load()
+    conteudo = json.dumps(d, ensure_ascii=False, indent=2)
+    buf = BytesIO(conteudo.encode("utf-8"))
+    nome_arquivo = f"backup_escola_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M')}.json"
+    return send_file(buf, as_attachment=True, download_name=nome_arquivo, mimetype="application/json")
+
+@app.route("/api/backup/restaurar", methods=["POST"])
+@login_required
+def restaurar_backup():
+    body = request.json or {}
+    novo = body.get("dados")
+    if not isinstance(novo, dict):
+        return jsonify({"erro": "Arquivo inválido."}), 400
+
+    chaves_esperadas = ("alunos", "materias", "turmas")
+    if not all(isinstance(novo.get(k), dict) for k in chaves_esperadas):
+        return jsonify({"erro": "Esse arquivo não parece ser um backup válido deste sistema."}), 400
+
+    # Nunca restaura para um estado sem nenhum usuário (evita perder o acesso ao sistema)
+    if not isinstance(novo.get("usuarios"), dict) or not novo.get("usuarios"):
+        novo["usuarios"] = load().get("usuarios", {})
+    if "config" not in novo or not isinstance(novo.get("config"), dict):
+        novo["config"] = {}
+
+    save(novo)
+    return jsonify({"ok": True})
+
 init_db()
 
 if __name__ == "__main__":
