@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
-import os, html, psycopg2, sqlite3, json, uuid, time, datetime, base64, re
+import os, html, psycopg2, sqlite3, json, uuid, time, datetime, base64, re, csv, io
 from io import BytesIO
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.drawing.image import Image as XLImage
@@ -235,6 +235,77 @@ def add_aluno():
     d["alunos"][mat] = {"nome": nome, "materias": [], "turma": turma}
     save(d)
     return jsonify({"ok": True})
+
+@app.route("/api/alunos/importar", methods=["POST"])
+@login_required
+def importar_alunos():
+    d = load()
+    arquivo = request.files.get("arquivo")
+    if not arquivo or not arquivo.filename:
+        return jsonify({"erro": "Envie um arquivo .xlsx ou .csv."}), 400
+
+    nome_arquivo = arquivo.filename.lower()
+    turma_padrao = sanitize(request.form.get("turma", ""))
+    if turma_padrao and turma_padrao not in d["turmas"]:
+        return jsonify({"erro": "Turma padrão não encontrada."}), 404
+
+    try:
+        if nome_arquivo.endswith(".csv"):
+            texto = arquivo.read().decode("utf-8-sig", errors="ignore")
+            linhas_brutas = list(csv.reader(io.StringIO(texto)))
+        elif nome_arquivo.endswith((".xlsx", ".xlsm")):
+            wb = load_workbook(BytesIO(arquivo.read()), data_only=True)
+            ws = wb.active
+            linhas_brutas = [[c.value for c in row] for row in ws.iter_rows()]
+        else:
+            return jsonify({"erro": "Formato não suportado. Envie um arquivo .xlsx ou .csv."}), 400
+    except Exception:
+        return jsonify({"erro": "Não foi possível ler esse arquivo."}), 400
+
+    linhas_brutas = [linha for linha in linhas_brutas if any(c not in (None, "") for c in linha)]
+    if not linhas_brutas:
+        return jsonify({"erro": "Arquivo vazio."}), 400
+
+    primeira = [str(c).strip().lower() if c is not None else "" for c in linhas_brutas[0]]
+    col_nome, col_turma, inicio = 0, 1, 0
+    if "nome" in primeira:
+        col_nome = primeira.index("nome")
+        col_turma = primeira.index("turma") if "turma" in primeira else None
+        inicio = 1
+
+    nomes_existentes = {a["nome"].lower() for a in d["alunos"].values()}
+    criados, duplicados, erros = 0, 0, []
+
+    for i, linha in enumerate(linhas_brutas[inicio:], start=inicio + 1):
+        if col_nome >= len(linha):
+            continue
+        nome_bruto = linha[col_nome]
+        if nome_bruto is None or not str(nome_bruto).strip():
+            continue
+        nome = sanitize(str(nome_bruto))
+
+        turma_linha = ""
+        if col_turma is not None and col_turma < len(linha) and linha[col_turma]:
+            turma_linha = sanitize(str(linha[col_turma]))
+        turma_final = turma_linha or turma_padrao
+
+        if turma_final and turma_final not in d["turmas"]:
+            erros.append(f"Linha {i}: turma \"{turma_final}\" não existe — \"{nome}\" foi cadastrado sem turma.")
+            turma_final = ""
+
+        if nome.lower() in nomes_existentes:
+            duplicados += 1
+            continue
+
+        mat = str(uuid.uuid4())[:8]
+        while mat in d["alunos"]:
+            mat = str(uuid.uuid4())[:8]
+        d["alunos"][mat] = {"nome": nome, "materias": [], "turma": turma_final}
+        nomes_existentes.add(nome.lower())
+        criados += 1
+
+    save(d)
+    return jsonify({"ok": True, "criados": criados, "duplicados": duplicados, "erros": erros[:20]})
 
 @app.route("/api/alunos/<matricula>", methods=["DELETE"])
 @login_required
