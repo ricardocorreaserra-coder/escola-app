@@ -518,6 +518,24 @@ tr.group-row td {
       <div class="msg" id="a-msg"></div>
     </div>
     <div class="card">
+      <h3>Importar alunos via planilha</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Envie um arquivo .xlsx ou .csv com colunas "Nome" e "Turma" (Turma é opcional). <a href="#" onclick="baixarModeloImportacao();return false;">Baixar modelo</a>
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="file" id="imp-arquivo" accept=".xlsx,.csv">
+        </div>
+        <div class="form-group">
+          <select id="imp-turma">
+            <option value="">Sem turma padrão</option>
+          </select>
+        </div>
+        <button class="btn btn-blue" onclick="importarAlunos()"><i class="ti ti-upload"></i> Importar</button>
+      </div>
+      <div class="msg" id="imp-msg"></div>
+    </div>
+    <div class="card">
       <h3>Alunos cadastrados</h3>
       <div class="form-row" style="margin-bottom:12px">
         <div class="form-group">
@@ -1062,6 +1080,11 @@ function populateSelects(){
   const v4=drs.value;
   drs.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   drs.value=v4;
+
+  const imps=document.getElementById('imp-turma');
+  const v5=imps.value;
+  imps.innerHTML='<option value="">Sem turma padrão</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  imps.value=v5;
 }
 
 function abrirModal(id,nome,turma){
@@ -1159,6 +1182,57 @@ async function delAluno(mat){
   if(!confirm('Excluir este aluno?'))return;
   await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');
   refresh();
+}
+
+function baixarModeloImportacao(){
+  const conteudo='Nome,Turma\nJoão da Silva,9 Ano A\nMaria Souza,\n';
+  const blob=new Blob([conteudo],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='modelo_importacao_alunos.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importarAlunos(){
+  const input=document.getElementById('imp-arquivo');
+  const turma=document.getElementById('imp-turma').value;
+  const msg=document.getElementById('imp-msg');
+  const file=input.files[0];
+  if(!file){
+    msg.style.color='#ef4444';
+    msg.textContent='Escolha um arquivo .xlsx ou .csv.';
+    return;
+  }
+  const formData=new FormData();
+  formData.append('arquivo',file);
+  if(turma) formData.append('turma',turma);
+  msg.style.color='#64748b';
+  msg.textContent='Importando...';
+  try{
+    const resp=await fetch('/api/alunos/importar',{method:'POST',body:formData});
+    const r=await resp.json();
+    if(r.ok){
+      msg.style.color='#10b981';
+      let texto=`${r.criados} aluno(s) importado(s) com sucesso!`;
+      if(r.duplicados) texto+=` ${r.duplicados} ignorado(s) por já existir.`;
+      if(r.erros&&r.erros.length){
+        texto+='<br><span style="color:#f59e0b">'+r.erros.join('<br>')+'</span>';
+      }
+      msg.innerHTML=texto;
+      input.value='';
+      await refresh();
+    }else{
+      msg.style.color='#ef4444';
+      msg.textContent=r.erro;
+    }
+  }catch(e){
+    msg.style.color='#ef4444';
+    msg.textContent='Erro ao importar o arquivo.';
+  }
 }
 
 async function addTurma(){
