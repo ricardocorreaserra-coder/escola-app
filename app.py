@@ -137,6 +137,10 @@ def load():
             d["turmas"] = {}
         if "config" not in d:
             d["config"] = {}
+        if "professores" not in d:
+            d["professores"] = {}
+        if "cursos" not in d:
+            d["cursos"] = {}
         return d
     finally:
         c.close()
@@ -370,17 +374,154 @@ def desassoc_materia(matricula, materia):
     save(d)
     return jsonify({"ok": True})
 
+@app.route("/api/cursos", methods=["POST"])
+@login_required
+def add_curso():
+    d = load()
+    nome = sanitize(request.json.get("nome", ""))
+    if not nome:
+        return jsonify({"erro": "Nome do curso é obrigatório."}), 400
+    if nome in d["cursos"]:
+        return jsonify({"erro": "Curso já existe."}), 400
+    d["cursos"][nome] = {}
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/cursos/<nome>", methods=["DELETE"])
+@login_required
+def del_curso(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["cursos"]:
+        return jsonify({"erro": "Curso não encontrado."}), 404
+    del d["cursos"][nome]
+    for mat in d["materias"].values():
+        if mat.get("curso") == nome:
+            mat["curso"] = ""
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/professores", methods=["POST"])
+@login_required
+def add_professor():
+    d = load()
+    nome = sanitize(request.json.get("nome", ""))
+    if not nome:
+        return jsonify({"erro": "Nome do professor é obrigatório."}), 400
+    if nome in d["professores"]:
+        return jsonify({"erro": "Professor já cadastrado."}), 400
+    d["professores"][nome] = {}
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/professores/<nome>", methods=["DELETE"])
+@login_required
+def del_professor(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["professores"]:
+        return jsonify({"erro": "Professor não encontrado."}), 404
+    del d["professores"][nome]
+    for mat in d["materias"].values():
+        if mat.get("professor") == nome:
+            mat["professor"] = ""
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/professores/<nome>/materias", methods=["POST"])
+@login_required
+def atribuir_materias_professor(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["professores"]:
+        return jsonify({"erro": "Professor não encontrado."}), 404
+    materias_novas = {sanitize(m) for m in request.json.get("materias", [])}
+    for mat_nome, mat in d["materias"].items():
+        if mat_nome in materias_novas:
+            mat["professor"] = nome
+        elif mat.get("professor") == nome:
+            mat["professor"] = ""
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/materias/<nome>/curso", methods=["POST"])
+@login_required
+def definir_curso_materia(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    curso = sanitize(request.json.get("curso", "")) if request.json.get("curso") else ""
+    if curso and curso not in d["cursos"]:
+        return jsonify({"erro": "Curso não encontrado."}), 404
+    d["materias"][nome]["curso"] = curso
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/materias/<nome>/professor", methods=["POST"])
+@login_required
+def definir_professor_materia(nome):
+    d = load()
+    nome = sanitize(nome)
+    if nome not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    professor = sanitize(request.json.get("professor", "")) if request.json.get("professor") else ""
+    if professor and professor not in d["professores"]:
+        return jsonify({"erro": "Professor não encontrado."}), 404
+    d["materias"][nome]["professor"] = professor
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/turmas/<turma>/associar-materia", methods=["POST"])
+@login_required
+def associar_turma_materia(turma):
+    d = load()
+    turma = sanitize(turma)
+    materia = sanitize(request.json.get("materia", ""))
+    if turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    if materia not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    afetados = 0
+    for aluno in d["alunos"].values():
+        if aluno.get("turma") == turma and materia not in aluno.get("materias", []):
+            aluno.setdefault("materias", []).append(materia)
+            afetados += 1
+    save(d)
+    return jsonify({"ok": True, "afetados": afetados})
+
+@app.route("/api/turmas/<turma>/desassociar-materia", methods=["POST"])
+@login_required
+def desassociar_turma_materia(turma):
+    d = load()
+    turma = sanitize(turma)
+    materia = sanitize(request.json.get("materia", ""))
+    if turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    afetados = 0
+    for aluno in d["alunos"].values():
+        if aluno.get("turma") == turma and materia in aluno.get("materias", []):
+            aluno["materias"].remove(materia)
+            afetados += 1
+    save(d)
+    return jsonify({"ok": True, "afetados": afetados})
+
 @app.route("/api/materias", methods=["POST"])
 @login_required
 def add_materia():
     d = load()
     nome = sanitize(request.json.get("nome", ""))
-    prof = sanitize(request.json.get("professor", ""))
+    prof = sanitize(request.json.get("professor", "")) if request.json.get("professor") else ""
+    curso = sanitize(request.json.get("curso", "")) if request.json.get("curso") else ""
     if not nome:
         return jsonify({"erro": "Nome da matéria é obrigatório."}), 400
     if nome in d["materias"]:
         return jsonify({"erro": "Matéria já existe."}), 400
-    d["materias"][nome] = {"professor": prof, "chamadas": {}, "notas": {}, "conteudos": {}}
+    if prof and prof not in d["professores"]:
+        return jsonify({"erro": "Professor não encontrado."}), 404
+    if curso and curso not in d["cursos"]:
+        return jsonify({"erro": "Curso não encontrado."}), 404
+    d["materias"][nome] = {"professor": prof, "curso": curso, "chamadas": {}, "notas": {}, "conteudos": {}}
     save(d)
     return jsonify({"ok": True})
 
@@ -781,6 +922,8 @@ def gerar_diario():
     alunos.sort(key=lambda x: x[1]["nome"])
 
     mat_dados = d["materias"][materia]
+    if not curso:
+        curso = mat_dados.get("curso", "")
     chamadas = mat_dados.get("chamadas", {})
     notas = mat_dados.get("notas", {})
     conteudos = mat_dados.get("conteudos", {})
