@@ -55,6 +55,9 @@ body {
   gap: 1.5rem;
   max-width: 1100px;
   margin: 0 auto;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
 }
 .tab {
   padding: 14px 4px;
@@ -488,6 +491,8 @@ tr.group-row td {
   <div class="tabs">
     <button class="tab active" onclick="showTab('alunos',this)">Alunos</button>
     <button class="tab" onclick="showTab('turmas',this)">Turmas</button>
+    <button class="tab" onclick="showTab('cursos',this)">Cursos</button>
+    <button class="tab" onclick="showTab('professores',this)">Professores</button>
     <button class="tab" onclick="showTab('materias',this)">Matérias</button>
     <button class="tab" onclick="showTab('assoc',this)">Associar</button>
     <button class="tab" onclick="showTab('chamada',this)">Chamada</button>
@@ -594,6 +599,70 @@ tr.group-row td {
     </div>
   </div>
 
+  <!-- SEÇÃO: CURSOS -->
+  <div id="sec-cursos" class="section">
+    <h2 class="section-title">Cursos</h2>
+    <div class="card">
+      <h3>Cadastrar curso</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="cu-nome" placeholder="Nome do curso (ex: Técnico em Radiologia)">
+        </div>
+        <button class="btn btn-primary" onclick="addCurso()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="cu-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Cursos cadastrados</h3>
+      <div class="table-container">
+        <table id="t-cursos">
+          <thead>
+            <tr>
+              <th>Curso</th>
+              <th>Matérias</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum curso cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: PROFESSORES -->
+  <div id="sec-professores" class="section">
+    <h2 class="section-title">Professores</h2>
+    <div class="card">
+      <h3>Cadastrar professor</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="pr-nome" placeholder="Nome do professor">
+        </div>
+        <button class="btn btn-primary" onclick="addProfessor()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="pr-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Professores cadastrados</h3>
+      <div class="table-container">
+        <table id="t-professores">
+          <thead>
+            <tr>
+              <th>Professor</th>
+              <th>Matérias lecionadas</th>
+              <th style="width: 140px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum professor cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- SEÇÃO: MATÉRIAS -->
   <div id="sec-materias" class="section">
     <h2 class="section-title">Matérias</h2>
@@ -604,7 +673,14 @@ tr.group-row td {
           <input id="m-nome" placeholder="Nome da matéria">
         </div>
         <div class="form-group">
-          <input id="m-prof" placeholder="Professor responsável">
+          <select id="m-prof">
+            <option value="">Sem professor definido</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="m-curso">
+            <option value="">Sem curso definido</option>
+          </select>
         </div>
         <button class="btn btn-primary" onclick="addMateria()"><i class="ti ti-plus"></i> Cadastrar</button>
       </div>
@@ -618,11 +694,12 @@ tr.group-row td {
             <tr>
               <th>Matéria</th>
               <th>Professor</th>
+              <th>Curso</th>
               <th style="width: 80px;" class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>
+            <tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>
           </tbody>
         </table>
       </div>
@@ -689,6 +766,27 @@ tr.group-row td {
         <button class="btn btn-primary" onclick="assoc()"><i class="ti ti-link"></i> Associar</button>
       </div>
       <div class="msg" id="as-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Associar turma inteira a uma matéria</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Vincula de uma vez todos os alunos de uma turma à matéria escolhida — útil no início do ano/bimestre.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="att2-turma">
+            <option value="">Selecione a turma</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="att2-mat">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="associarTurmaMateria()"><i class="ti ti-link"></i> Associar todos</button>
+        <button class="btn btn-blue" onclick="desassociarTurmaMateria()"><i class="ti ti-unlink"></i> Desassociar todos</button>
+      </div>
+      <div class="msg" id="att2-msg"></div>
     </div>
     <div class="card">
       <h3>Associações ativas</h3>
@@ -803,7 +901,7 @@ tr.group-row td {
           </select>
         </div>
         <div class="form-group">
-          <select id="dr-materia">
+          <select id="dr-materia" onchange="preencherCursoDiario()">
             <option value="">Selecione a matéria</option>
           </select>
         </div>
@@ -877,6 +975,19 @@ tr.group-row td {
   </div>
 </div>
 
+<div class="modal-bg" id="modal-prof-materias" style="display:none">
+  <div class="modal">
+    <h3>Atribuir matérias</h3>
+    <p style="font-size:13px; color:#64748b; margin-bottom:10px">Marque as matérias que <strong id="pm-nome-professor"></strong> vai lecionar.</p>
+    <div id="pm-lista" style="max-height:300px; overflow-y:auto; margin-bottom:10px"></div>
+    <div class="msg" id="pm-msg"></div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn" style="background:#f1f5f9; color:#475569" onclick="fecharModalProfMaterias()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarMateriasProfessor()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let dados={alunos:{},materias:{},turmas:{}};
 let editandoId=null;
@@ -893,6 +1004,8 @@ async function refresh(){
   dados=await api('/api/dados');
   renderAlunos();
   renderTurmas();
+  renderCursos();
+  renderProfessores();
   renderMaterias();
   renderAssoc();
   populateSelects();
@@ -999,22 +1112,71 @@ function renderTurmas(){
   `}).join('');
 }
 
+function renderCursos(){
+  const tb=document.querySelector('#t-cursos tbody');
+  const nomes=Object.keys(dados.cursos||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!nomes.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum curso cadastrado.</td></tr>';
+    return;
+  }
+  tb.innerHTML=nomes.map(nome=>{
+    const qtd=Object.values(dados.materias).filter(m=>m.curso===nome).length;
+    return `
+    <tr>
+      <td class="font-medium">${nome}</td>
+      <td>${qtd}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="delCurso('${nome.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `}).join('');
+}
+
+function renderProfessores(){
+  const tb=document.querySelector('#t-professores tbody');
+  const nomes=Object.keys(dados.professores||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!nomes.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhum professor cadastrado.</td></tr>';
+    return;
+  }
+  tb.innerHTML=nomes.map(nome=>{
+    const materias=Object.entries(dados.materias).filter(([,m])=>m.professor===nome).map(([mn])=>mn);
+    const badges=materias.length?materias.map(m=>`<span class="badge">${m}</span>`).join(''):'—';
+    return `
+    <tr>
+      <td class="font-medium">${nome}</td>
+      <td>${badges}</td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        <button class="btn-icon btn-edit" onclick="abrirModalProfMaterias('${nome.replace(/'/g,"\\'")}')"><i class="ti ti-books"></i></button>
+        <button class="btn-icon btn-delete" onclick="delProfessor('${nome.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `}).join('');
+}
+
 function renderMaterias(){
   const tb=document.querySelector('#t-materias tbody');
   const rows=Object.entries(dados.materias);
   if(!rows.length){
-    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>';
+    tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>';
     return;
   }
-  tb.innerHTML=rows.map(([nome,m])=>`
+  const professores=Object.keys(dados.professores||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const cursos=Object.keys(dados.cursos||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  tb.innerHTML=rows.map(([nome,m])=>{
+    const nomeEsc=nome.replace(/'/g,"\\'");
+    const optsProf='<option value="">Sem professor</option>'+professores.map(p=>`<option value="${p}" ${p===m.professor?'selected':''}>${p}</option>`).join('');
+    const optsCurso='<option value="">Sem curso</option>'+cursos.map(c=>`<option value="${c}" ${c===m.curso?'selected':''}>${c}</option>`).join('');
+    return `
     <tr>
       <td class="font-medium">${nome}</td>
-      <td>${m.professor||'—'}</td>
+      <td><select onchange="definirProfessorMateria('${nomeEsc}',this.value)">${optsProf}</select></td>
+      <td><select onchange="definirCursoMateria('${nomeEsc}',this.value)">${optsCurso}</select></td>
       <td class="text-center">
-        <button class="btn-icon btn-delete" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button>
+        <button class="btn-icon btn-delete" onclick="delMateria('${nomeEsc}')"><i class="ti ti-trash"></i></button>
       </td>
     </tr>
-  `).join('');
+  `}).join('');
 }
 
 function renderAssoc(){
@@ -1049,13 +1211,15 @@ function populateSelects(){
   const alunos=alunosOrdenados();
   const mats=Object.keys(dados.materias);
   const turmas=Object.keys(dados.turmas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const cursos=Object.keys(dados.cursos||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const professores=Object.keys(dados.professores||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   ['as-aluno','bl-aluno','att-aluno'].forEach(id=>{
     const s=document.getElementById(id);
     const v=s.value;
     s.innerHTML='<option value="">Selecione o aluno</option>'+opcoesAlunosAgrupadas(alunos);
     s.value=v;
   });
-  ['as-mat','ch-mat','nt-mat','dr-materia','cl-mat'].forEach(id=>{
+  ['as-mat','ch-mat','nt-mat','dr-materia','cl-mat','att2-mat'].forEach(id=>{
     const s=document.getElementById(id);
     const v=s.value;
     s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');
@@ -1071,20 +1235,27 @@ function populateSelects(){
   fs.innerHTML='<option value="">Todas as turmas</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   fs.value=v2;
 
-  const ts=document.getElementById('att-turma');
-  const v3=ts.value;
-  ts.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
-  ts.value=v3;
-
-  const drs=document.getElementById('dr-turma');
-  const v4=drs.value;
-  drs.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
-  drs.value=v4;
+  ['att-turma','dr-turma','att2-turma'].forEach(id=>{
+    const ts=document.getElementById(id);
+    const v3=ts.value;
+    ts.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+    ts.value=v3;
+  });
 
   const imps=document.getElementById('imp-turma');
   const v5=imps.value;
   imps.innerHTML='<option value="">Sem turma padrão</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   imps.value=v5;
+
+  const mp=document.getElementById('m-prof');
+  const v6=mp.value;
+  mp.innerHTML='<option value="">Sem professor definido</option>'+professores.map(p=>`<option value="${p}">${p}</option>`).join('');
+  mp.value=v6;
+
+  const mc=document.getElementById('m-curso');
+  const v7=mc.value;
+  mc.innerHTML='<option value="">Sem curso definido</option>'+cursos.map(c=>`<option value="${c}">${c}</option>`).join('');
+  mc.value=v7;
 }
 
 function abrirModal(id,nome,turma){
@@ -1278,14 +1449,16 @@ async function associarTurma(){
 
 async function addMateria(){
   const nome=document.getElementById('m-nome').value.trim();
-  const prof=document.getElementById('m-prof').value.trim();
-  const r=await api('/api/materias','POST',{nome,professor:prof});
+  const prof=document.getElementById('m-prof').value;
+  const curso=document.getElementById('m-curso').value;
+  const r=await api('/api/materias','POST',{nome,professor:prof,curso});
   const msg=document.getElementById('m-msg');
   if(r.ok){
     msg.style.color='#10b981';
     msg.textContent='Matéria cadastrada com sucesso!';
     document.getElementById('m-nome').value='';
     document.getElementById('m-prof').value='';
+    document.getElementById('m-curso').value='';
     refresh();
   }else{
     msg.style.color='#ef4444';
@@ -1297,6 +1470,145 @@ async function delMateria(nome){
   if(!confirm('Excluir esta matéria?'))return;
   await api('/api/materias/'+encodeURIComponent(nome),'DELETE');
   refresh();
+}
+
+async function definirProfessorMateria(nome,professor){
+  await api('/api/materias/'+encodeURIComponent(nome)+'/professor','POST',{professor});
+  refresh();
+}
+
+async function definirCursoMateria(nome,curso){
+  await api('/api/materias/'+encodeURIComponent(nome)+'/curso','POST',{curso});
+  refresh();
+}
+
+async function addCurso(){
+  const nome=document.getElementById('cu-nome').value.trim();
+  const r=await api('/api/cursos','POST',{nome});
+  const msg=document.getElementById('cu-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Curso cadastrado com sucesso!';
+    document.getElementById('cu-nome').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delCurso(nome){
+  if(!confirm('Excluir este curso? As matérias vinculadas ficarão sem curso.'))return;
+  await api('/api/cursos/'+encodeURIComponent(nome),'DELETE');
+  refresh();
+}
+
+async function addProfessor(){
+  const nome=document.getElementById('pr-nome').value.trim();
+  const r=await api('/api/professores','POST',{nome});
+  const msg=document.getElementById('pr-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Professor cadastrado com sucesso!';
+    document.getElementById('pr-nome').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delProfessor(nome){
+  if(!confirm('Excluir este professor? As matérias vinculadas ficarão sem professor.'))return;
+  await api('/api/professores/'+encodeURIComponent(nome),'DELETE');
+  refresh();
+}
+
+let professorEditando=null;
+
+function abrirModalProfMaterias(nome){
+  professorEditando=nome;
+  document.getElementById('pm-nome-professor').textContent=nome;
+  document.getElementById('pm-msg').textContent='';
+  const lista=document.getElementById('pm-lista');
+  const materias=Object.keys(dados.materias).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!materias.length){
+    lista.innerHTML='<div style="color:#94a3b8; font-size:13px">Nenhuma matéria cadastrada ainda.</div>';
+  }else{
+    lista.innerHTML=materias.map(m=>{
+      const id='pmchk-'+m.replace(/[^a-zA-Z0-9]/g,'_');
+      const checked=dados.materias[m].professor===nome?'checked':'';
+      return `
+      <div class="check-row">
+        <input type="checkbox" id="${id}" data-materia="${m}" ${checked}>
+        <label for="${id}">${m}</label>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('modal-prof-materias').style.display='flex';
+}
+
+function fecharModalProfMaterias(){
+  professorEditando=null;
+  document.getElementById('modal-prof-materias').style.display='none';
+}
+
+async function salvarMateriasProfessor(){
+  if(!professorEditando) return;
+  const checks=document.querySelectorAll('#pm-lista input[type="checkbox"]:checked');
+  const materias=Array.from(checks).map(c=>c.dataset.materia);
+  const r=await api('/api/professores/'+encodeURIComponent(professorEditando)+'/materias','POST',{materias});
+  const msg=document.getElementById('pm-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Matérias atribuídas com sucesso!';
+    await refresh();
+    setTimeout(fecharModalProfMaterias,800);
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function associarTurmaMateria(){
+  const turma=document.getElementById('att2-turma').value;
+  const materia=document.getElementById('att2-mat').value;
+  const msg=document.getElementById('att2-msg');
+  if(!turma||!materia){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione turma e matéria.';
+    return;
+  }
+  const r=await api('/api/turmas/'+encodeURIComponent(turma)+'/associar-materia','POST',{materia});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent=`${r.afetados} aluno(s) associado(s) com sucesso!`;
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function desassociarTurmaMateria(){
+  const turma=document.getElementById('att2-turma').value;
+  const materia=document.getElementById('att2-mat').value;
+  const msg=document.getElementById('att2-msg');
+  if(!turma||!materia){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione turma e matéria.';
+    return;
+  }
+  if(!confirm(`Desassociar a matéria "${materia}" de todos os alunos da turma "${turma}"?`))return;
+  const r=await api('/api/turmas/'+encodeURIComponent(turma)+'/desassociar-materia','POST',{materia});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent=`${r.afetados} aluno(s) desassociado(s).`;
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
 }
 
 function _fmtDataBR(data){
@@ -1659,6 +1971,15 @@ document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('cl-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('modal-editar').addEventListener('click',function(e){if(e.target===this)fecharModal();});
 document.getElementById('modal-senha').addEventListener('click',function(e){if(e.target===this)fecharModalSenha();});
+document.getElementById('modal-prof-materias').addEventListener('click',function(e){if(e.target===this)fecharModalProfMaterias();});
+
+function preencherCursoDiario(){
+  const materia=document.getElementById('dr-materia').value;
+  const cursoInput=document.getElementById('dr-curso');
+  if(materia && dados.materias[materia]?.curso){
+    cursoInput.value=dados.materias[materia].curso;
+  }
+}
 
 function baixarDiario(){
   const turma=document.getElementById('dr-turma').value;
