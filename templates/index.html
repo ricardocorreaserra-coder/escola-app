@@ -1,1231 +1,1700 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sistema Escolar</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
-  <style>
-    :root {
-      --azul:    #1a56db;
-      --azul-esc:#1338a0;
-      --cinza-bg:#f0f4f8;
-      --branco:  #ffffff;
-      --texto:   #1e293b;
-      --muted:   #64748b;
-      --borda:   #cbd5e1;
-      --verde:   #16a34a;
-      --vermelho:#dc2626;
-    }
-    body { background: var(--cinza-bg); color: var(--texto); font-family: 'Segoe UI', system-ui, sans-serif; }
-    /* SIDEBAR */
-    #sidebar {
-      width: 230px; min-height: 100vh; background: var(--azul-esc);
-      position: fixed; top:0; left:0; z-index:200; display:flex; flex-direction:column;
-      transition: width .2s;
-    }
-    #sidebar .brand { padding: 1.2rem 1rem 1rem; color:#fff; font-size:1.05rem; font-weight:700;
-      border-bottom:1px solid rgba(255,255,255,.15); display:flex; align-items:center; gap:.5rem; }
-    #sidebar .nav-link { color:rgba(255,255,255,.8); padding:.55rem 1rem; border-radius:6px;
-      margin:.1rem .5rem; font-size:.9rem; display:flex; align-items:center; gap:.55rem; }
-    #sidebar .nav-link:hover, #sidebar .nav-link.active {
-      background:rgba(255,255,255,.15); color:#fff; }
-    #sidebar .nav-section { color:rgba(255,255,255,.4); font-size:.7rem; text-transform:uppercase;
-      letter-spacing:.08em; padding:.9rem 1rem .2rem; }
-    #sidebar .logout-btn { margin-top:auto; padding:1rem; border-top:1px solid rgba(255,255,255,.15); }
-    #sidebar .logout-btn a { color:rgba(255,255,255,.7); font-size:.85rem; text-decoration:none;
-      display:flex; align-items:center; gap:.4rem; }
-    #sidebar .logout-btn a:hover { color:#fff; }
-    /* MAIN */
-    #main { margin-left: 230px; min-height:100vh; }
-    .topbar { background:var(--branco); border-bottom:1px solid var(--borda);
-      padding:.75rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
-    .topbar h5 { margin:0; font-size:1rem; font-weight:600; color:var(--texto); }
-    .topbar .usuario { font-size:.85rem; color:var(--muted); }
-    /* PÁGINAS */
-    .page { display:none; padding:1.5rem; }
-    .page.active { display:block; }
-    /* CARDS */
-    .card { border:1px solid var(--borda); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
-    .card-header { background:var(--branco); border-bottom:1px solid var(--borda);
-      font-weight:600; font-size:.95rem; padding:.8rem 1rem; border-radius:10px 10px 0 0; }
-    /* TABLE */
-    .table thead th { font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
-      border-bottom:2px solid var(--borda); padding:.6rem .8rem; background:var(--cinza-bg); }
-    .table tbody td { padding:.65rem .8rem; vertical-align:middle; font-size:.9rem; border-color:var(--borda); }
-    .table tbody tr:hover { background:#f8fafc; }
-    /* BADGES */
-    .badge-curso { background:#eff6ff; color:#1d4ed8; border-radius:4px; font-size:.75rem; padding:.2rem .45rem; }
-    .badge-mat  { background:#f0fdf4; color:#166534; border-radius:4px; font-size:.75rem; padding:.2rem .45rem; }
-    /* FORMS */
-    .form-label { font-size:.85rem; font-weight:500; color:var(--texto); }
-    .form-control, .form-select { font-size:.88rem; border-color:var(--borda); }
-    .form-control:focus, .form-select:focus { border-color:var(--azul); box-shadow:0 0 0 3px rgba(26,86,219,.15); }
-    /* BOTÕES */
-    .btn-primary { background:var(--azul); border-color:var(--azul); }
-    .btn-primary:hover { background:var(--azul-esc); border-color:var(--azul-esc); }
-    .btn-sm { font-size:.78rem; }
-    /* TOAST */
-    #toast-container { position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; }
-    .toast-msg { background:var(--texto); color:#fff; padding:.65rem 1rem; border-radius:8px;
-      margin-top:.5rem; font-size:.85rem; display:flex; align-items:center; gap:.5rem;
-      animation: fadeIn .25s ease; }
-    .toast-msg.erro { background:var(--vermelho); }
-    .toast-msg.ok   { background:var(--verde); }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-    /* RESPONSIVE */
-    @media(max-width:768px){
-      #sidebar{width:0;overflow:hidden;}
-      #main{margin-left:0;}
-    }
-    /* TABS */
-    .tab-assoc .nav-link { font-size:.85rem; color:var(--muted); border-radius:6px 6px 0 0; }
-    .tab-assoc .nav-link.active { color:var(--azul); font-weight:600; border-bottom:2px solid var(--azul); }
-    /* STAT CARDS */
-    .stat-card { background:var(--branco); border:1px solid var(--borda); border-radius:10px;
-      padding:1.2rem 1.4rem; display:flex; align-items:center; gap:1rem; }
-    .stat-icon { width:44px; height:44px; border-radius:10px; display:flex; align-items:center;
-      justify-content:center; font-size:1.25rem; }
-    .stat-icon.blue  { background:#eff6ff; color:var(--azul); }
-    .stat-icon.green { background:#f0fdf4; color:var(--verde); }
-    .stat-icon.purple{ background:#faf5ff; color:#7c3aed; }
-    .stat-icon.orange{ background:#fff7ed; color:#ea580c; }
-    .stat-icon.teal  { background:#f0fdfa; color:#0d9488; }
-    .stat-val { font-size:1.6rem; font-weight:700; line-height:1; }
-    .stat-lbl { font-size:.8rem; color:var(--muted); margin-top:.1rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Escolar</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  padding: 0;
+  min-height: 100vh;
+}
+.app-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.app-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+}
+.btn-logout {
+  color: #64748b;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s, color 0.2s;
+}
+.btn-logout:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+.tabs-container {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 2rem;
+}
+.tabs {
+  display: flex;
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.tab {
+  padding: 14px 4px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #64748b;
+  position: relative;
+  transition: color 0.2s;
+}
+.tab:hover {
+  color: #0f172a;
+}
+.tab.active {
+  color: #0284c7; /* Cyan / Light Blue text */
+  font-weight: 600;
+}
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #0ea5e9; /* Underline indicator */
+  border-radius: 2px;
+}
+.main-content {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+.section {
+  display: none;
+}
+.section.active {
+  display: block;
+}
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.025em;
+}
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+.card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 1.25rem;
+}
+.form-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 200px;
+}
+.form-group.small {
+  flex: 0 0 180px;
+  min-width: 150px;
+}
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  text-transform: none;
+}
+input, select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 42px;
+}
+input:focus, select:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 90px;
+  resize: vertical;
+}
+textarea:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+.conteudo-item {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: #f8fafc;
+}
+.conteudo-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.conteudo-item-header strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+.conteudo-item-texto {
+  font-size: 13px;
+  color: #475569;
+  white-space: pre-wrap;
+}
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.2s, transform 0.1s;
+  height: 42px;
+  border: none;
+}
+.btn-primary {
+  background-color: #0ea5e9;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: #0284c7;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+.btn-blue {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+.btn-blue:hover {
+  background-color: #1d4ed8;
+}
+.btn-blue:active {
+  transform: scale(0.98);
+}
+.table-container {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+th {
+  font-weight: 600;
+  color: #475569;
+  background-color: #f8fafc;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+tr:last-child td {
+  border-bottom: none;
+}
+.text-center {
+  text-align: center;
+}
+.font-medium {
+  font-weight: 500;
+}
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  color: #475569;
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+tr.group-row td {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.group-header {
+  padding: 10px 16px;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+}
+.group-header:first-of-type {
+  border-top: none;
+}
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+  font-size: 16px;
+}
+.btn-icon.btn-edit {
+  color: #2563eb;
+}
+.btn-icon.btn-edit:hover {
+  background-color: #dbeafe;
+}
+.btn-icon.btn-delete {
+  color: #ef4444;
+}
+.btn-icon.btn-delete:hover {
+  background-color: #fee2e2;
+}
+.msg {
+  font-size: 13px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+}
+.check-row:last-child {
+  border-bottom: none;
+}
+.check-row:hover {
+  background-color: #f8fafc;
+}
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0ea5e9;
+  cursor: pointer;
+}
+.check-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  flex: 1;
+}
+.nota-grid-input {
+  width: 68px;
+  text-align: center;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  height: 36px;
+}
+.nota-grid-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.media-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  height: 26px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ffffff;
+  padding: 2px 10px;
+}
+.media-badge.aprovado {
+  background-color: #10b981; /* Emerald-500 */
+}
+.media-badge.reprovado {
+  background-color: #f87171; /* Light red / coral */
+}
+.media-badge.none {
+  background-color: #94a3b8; /* Slate-400 */
+}
+.table-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+.btn-save-notas {
+  background-color: #1e293b;
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.btn-save-notas:hover {
+  background-color: #0f172a;
+}
+.btn-save-notas:active {
+  transform: scale(0.98);
+}
+.boletim-card {
+  margin-bottom: 1.5rem;
+}
+.boletim-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.boletim-card-header strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.no-grades {
+  font-size: 13px;
+  color: #64748b;
+  padding: 8px 0;
+}
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1rem;
+}
+.modal input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 1.25rem;
+  outline: none;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+</style>
 </head>
 <body>
 
-<!-- SIDEBAR -->
-<nav id="sidebar">
-  <div class="brand"><i class="bi bi-mortarboard-fill"></i> Sistema Escolar</div>
-  <div style="flex:1;overflow-y:auto;padding:.5rem 0;">
-    <div class="nav-section">Visão Geral</div>
-    <a class="nav-link active" href="#" data-page="dashboard">
-      <i class="bi bi-grid-1x2"></i> Dashboard
-    </a>
-    <div class="nav-section">Cadastros</div>
-    <a class="nav-link" href="#" data-page="cursos">
-      <i class="bi bi-journal-bookmark-fill"></i> Cursos
-    </a>
-    <a class="nav-link" href="#" data-page="materias">
-      <i class="bi bi-book-fill"></i> Matérias
-    </a>
-    <a class="nav-link" href="#" data-page="professores">
-      <i class="bi bi-person-workspace"></i> Professores
-    </a>
-    <a class="nav-link" href="#" data-page="alunos">
-      <i class="bi bi-people-fill"></i> Alunos
-    </a>
-    <a class="nav-link" href="#" data-page="turmas">
-      <i class="bi bi-collection-fill"></i> Turmas
-    </a>
-    <div class="nav-section">Registro</div>
-    <a class="nav-link" href="#" data-page="associar">
-      <i class="bi bi-link-45deg"></i> Associar
-    </a>
-    <a class="nav-link" href="#" data-page="chamada">
-      <i class="bi bi-calendar-check-fill"></i> Chamada
-    </a>
-    <a class="nav-link" href="#" data-page="notas">
-      <i class="bi bi-clipboard2-data-fill"></i> Notas
-    </a>
+<header class="app-header">
+  <h1>Sistema Escolar</h1>
+  <div style="display: flex; align-items: center; gap: 1rem;">
+    <span style="font-size: 14px; color: #64748b; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;"><i class="ti ti-user" style="font-size: 16px;"></i> Olá, {{ session.get('nome', 'Usuário') }}</span>
+    <a href="#" onclick="abrirModalSenha();return false;" class="btn-logout" style="background:#f1f5f9; color:#475569"><i class="ti ti-key"></i> Trocar senha</a>
+    <a href="/logout" class="btn-logout"><i class="ti ti-logout"></i> Sair</a>
   </div>
-  <div class="logout-btn">
-    <a href="/logout"><i class="bi bi-box-arrow-left"></i> Sair</a>
-  </div>
-</nav>
+</header>
 
-<!-- MAIN -->
-<div id="main">
-  <div class="topbar">
-    <h5 id="topbar-title">Dashboard</h5>
-    <span class="usuario"><i class="bi bi-person-circle"></i> {{ session.get('nome','Administrador') }}</span>
+<div class="tabs-container">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('alunos',this)">Alunos</button>
+    <button class="tab" onclick="showTab('turmas',this)">Turmas</button>
+    <button class="tab" onclick="showTab('materias',this)">Matérias</button>
+    <button class="tab" onclick="showTab('assoc',this)">Associar</button>
+    <button class="tab" onclick="showTab('chamada',this)">Chamada</button>
+    <button class="tab" onclick="showTab('notas',this)">Notas</button>
+    <button class="tab" onclick="showTab('boletim',this)">Boletim</button>
+    <button class="tab" onclick="showTab('diario',this)">Diário</button>
+    <button class="tab" onclick="showTab('backup',this)">Backup</button>
+  </div>
+</div>
+
+<main class="main-content">
+  <!-- SEÇÃO: ALUNOS -->
+  <div id="sec-alunos" class="section active">
+    <h2 class="section-title">Alunos</h2>
+    <div class="card">
+      <h3>Cadastrar aluno</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="a-nome" placeholder="Nome completo do aluno">
+        </div>
+        <div class="form-group">
+          <select id="a-turma">
+            <option value="">Sem turma</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="addAluno()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="a-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Alunos cadastrados</h3>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+          <select id="f-turma" onchange="renderAlunos()">
+            <option value="">Todas as turmas</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-container">
+        <table id="t-alunos">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Turma</th>
+              <th>Matérias</th>
+              <th style="width: 100px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <!-- ===================== DASHBOARD ===================== -->
-  <div class="page active" id="page-dashboard">
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-md-4 col-lg-2">
-        <div class="stat-card"><div class="stat-icon blue"><i class="bi bi-journal-bookmark-fill"></i></div>
-          <div><div class="stat-val" id="stat-cursos">0</div><div class="stat-lbl">Cursos</div></div></div>
+  <!-- SEÇÃO: TURMAS -->
+  <div id="sec-turmas" class="section">
+    <h2 class="section-title">Turmas</h2>
+    <div class="card">
+      <h3>Cadastrar turma</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="t-nome" placeholder="Nome da turma (ex: 9º Ano A)">
+        </div>
+        <button class="btn btn-primary" onclick="addTurma()"><i class="ti ti-plus"></i> Cadastrar</button>
       </div>
-      <div class="col-6 col-md-4 col-lg-2">
-        <div class="stat-card"><div class="stat-icon green"><i class="bi bi-book-fill"></i></div>
-          <div><div class="stat-val" id="stat-materias">0</div><div class="stat-lbl">Matérias</div></div></div>
+      <div class="msg" id="t-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Turmas cadastradas</h3>
+      <div class="table-container">
+        <table id="t-turmas">
+          <thead>
+            <tr>
+              <th>Turma</th>
+              <th>Alunos</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma turma cadastrada.</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="col-6 col-md-4 col-lg-2">
-        <div class="stat-card"><div class="stat-icon purple"><i class="bi bi-person-workspace"></i></div>
-          <div><div class="stat-val" id="stat-professores">0</div><div class="stat-lbl">Professores</div></div></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: MATÉRIAS -->
+  <div id="sec-materias" class="section">
+    <h2 class="section-title">Matérias</h2>
+    <div class="card">
+      <h3>Cadastrar matéria</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="m-nome" placeholder="Nome da matéria">
+        </div>
+        <div class="form-group">
+          <input id="m-prof" placeholder="Professor responsável">
+        </div>
+        <button class="btn btn-primary" onclick="addMateria()"><i class="ti ti-plus"></i> Cadastrar</button>
       </div>
-      <div class="col-6 col-md-4 col-lg-2">
-        <div class="stat-card"><div class="stat-icon orange"><i class="bi bi-people-fill"></i></div>
-          <div><div class="stat-val" id="stat-alunos">0</div><div class="stat-lbl">Alunos</div></div></div>
-      </div>
-      <div class="col-6 col-md-4 col-lg-2">
-        <div class="stat-card"><div class="stat-icon teal"><i class="bi bi-collection-fill"></i></div>
-          <div><div class="stat-val" id="stat-turmas">0</div><div class="stat-lbl">Turmas</div></div></div>
+      <div class="msg" id="m-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Matérias cadastradas</h3>
+      <div class="table-container">
+        <table id="t-materias">
+          <thead>
+            <tr>
+              <th>Matéria</th>
+              <th>Professor</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><i class="bi bi-list-ul me-1"></i> Alunos cadastrados</div>
-      <div class="card-body p-0">
-        <table class="table mb-0" id="tbl-dash-alunos">
-          <thead><tr><th>Matrícula</th><th>Nome</th><th>Turma(s)</th><th>Matérias</th></tr></thead>
-          <tbody></tbody>
-        </table>
+      <h3>Conteúdo lecionado</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Matéria</label>
+          <select id="cl-mat" onchange="renderConteudos()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group small">
+          <label>Data da aula</label>
+          <input type="date" id="cl-data">
+        </div>
       </div>
+      <div class="form-row">
+        <div class="form-group" style="min-width:100%">
+          <label>Conteúdo lecionado</label>
+          <textarea id="cl-texto" placeholder="O que foi ensinado nesta aula..."></textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="salvarConteudo()"><i class="ti ti-plus"></i> Salvar</button>
+      <div class="msg" id="cl-msg"></div>
+      <div id="cl-lista" style="margin-top:16px"></div>
     </div>
   </div>
 
-  <!-- ===================== CURSOS ===================== -->
-  <div class="page" id="page-cursos">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-plus-circle me-1"></i> Novo Curso</div>
-          <div class="card-body">
-            <div class="mb-2"><label class="form-label">Nome do Curso</label>
-              <input id="curso-nome" class="form-control" placeholder="Ex: Ensino Médio"/></div>
-            <div class="mb-3"><label class="form-label">Descrição</label>
-              <input id="curso-desc" class="form-control" placeholder="Opcional"/></div>
-            <button class="btn btn-primary w-100" onclick="addCurso()">
-              <i class="bi bi-plus-lg me-1"></i> Cadastrar Curso
-            </button>
-          </div>
+  <!-- SEÇÃO: ASSOCIAR -->
+  <div id="sec-assoc" class="section">
+    <h2 class="section-title">Associar</h2>
+    <div class="card">
+      <h3>Associar aluno a turma</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="att-aluno">
+            <option value="">Selecione o aluno</option>
+          </select>
         </div>
-      </div>
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-journal-bookmark-fill me-1"></i> Cursos Cadastrados</div>
-          <div class="card-body p-0">
-            <table class="table mb-0" id="tbl-cursos">
-              <thead><tr><th>Curso</th><th>Descrição</th><th>Matérias</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
+        <div class="form-group">
+          <select id="att-turma">
+            <option value="">Selecione a turma</option>
+          </select>
         </div>
+        <button class="btn btn-primary" onclick="associarTurma()"><i class="ti ti-link"></i> Associar</button>
       </div>
+      <div class="msg" id="att-msg"></div>
     </div>
-  </div>
-
-  <!-- ===================== MATÉRIAS ===================== -->
-  <div class="page" id="page-materias">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-plus-circle me-1"></i> Nova Matéria</div>
-          <div class="card-body">
-            <div class="mb-2"><label class="form-label">Nome da Matéria</label>
-              <input id="mat-nome" class="form-control" placeholder="Ex: Matemática"/></div>
-            <div class="mb-2"><label class="form-label">Curso</label>
-              <select id="mat-curso" class="form-select">
-                <option value="">— Selecione um curso —</option>
-              </select></div>
-            <div class="mb-3"><label class="form-label">Professor (opcional)</label>
-              <input id="mat-prof" class="form-control" placeholder="Nome do professor"/></div>
-            <button class="btn btn-primary w-100" onclick="addMateria()">
-              <i class="bi bi-plus-lg me-1"></i> Cadastrar Matéria
-            </button>
-          </div>
+    <div class="card">
+      <h3>Associar aluno a matéria</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="as-aluno">
+            <option value="">Selecione o aluno</option>
+          </select>
         </div>
-      </div>
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-book-fill me-1"></i> Matérias Cadastradas</div>
-          <div class="card-body p-0">
-            <table class="table mb-0" id="tbl-materias">
-              <thead><tr><th>Matéria</th><th>Curso</th><th>Professor</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
+        <div class="form-group">
+          <select id="as-mat">
+            <option value="">Selecione a matéria</option>
+          </select>
         </div>
+        <button class="btn btn-primary" onclick="assoc()"><i class="ti ti-link"></i> Associar</button>
       </div>
+      <div class="msg" id="as-msg"></div>
     </div>
-  </div>
-
-  <!-- ===================== PROFESSORES ===================== -->
-  <div class="page" id="page-professores">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-plus-circle me-1"></i> Novo Professor</div>
-          <div class="card-body">
-            <div class="mb-2"><label class="form-label">Nome</label>
-              <input id="prof-nome" class="form-control" placeholder="Nome completo"/></div>
-            <div class="mb-3"><label class="form-label">E-mail</label>
-              <input id="prof-email" class="form-control" type="email" placeholder="email@escola.com"/></div>
-            <button class="btn btn-primary w-100" onclick="addProfessor()">
-              <i class="bi bi-plus-lg me-1"></i> Cadastrar Professor
-            </button>
-          </div>
-        </div>
-        <div class="card mt-3" id="card-atribuir-mat" style="display:none">
-          <div class="card-header"><i class="bi bi-link-45deg me-1"></i> Atribuir Matéria</div>
-          <div class="card-body">
-            <p class="mb-2 text-muted" style="font-size:.83rem">Professor: <strong id="prof-sel-nome"></strong></p>
-            <div class="mb-3"><label class="form-label">Matéria</label>
-              <select id="prof-mat-sel" class="form-select">
-                <option value="">— Selecione —</option>
-              </select></div>
-            <button class="btn btn-success w-100" onclick="atribuirMatProf()">
-              <i class="bi bi-check-lg me-1"></i> Atribuir Matéria
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-person-workspace me-1"></i> Professores Cadastrados</div>
-          <div class="card-body p-0">
-            <table class="table mb-0" id="tbl-professores">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Matérias</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== ALUNOS ===================== -->
-  <div class="page" id="page-alunos">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-plus-circle me-1"></i> Novo Aluno</div>
-          <div class="card-body">
-            <div class="mb-3"><label class="form-label">Nome do Aluno</label>
-              <input id="aluno-nome" class="form-control" placeholder="Nome completo"/></div>
-            <button class="btn btn-primary w-100" onclick="addAluno()">
-              <i class="bi bi-plus-lg me-1"></i> Cadastrar Aluno
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-people-fill me-1"></i> Alunos Cadastrados</div>
-          <div class="card-body p-0">
-            <table class="table mb-0" id="tbl-alunos">
-              <thead><tr><th>Matrícula</th><th>Nome</th><th>Matérias</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== TURMAS ===================== -->
-  <div class="page" id="page-turmas">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-plus-circle me-1"></i> Nova Turma</div>
-          <div class="card-body">
-            <div class="mb-2"><label class="form-label">Nome da Turma</label>
-              <input id="turma-nome" class="form-control" placeholder="Ex: 1º A"/></div>
-            <div class="mb-2"><label class="form-label">Curso</label>
-              <select id="turma-curso" class="form-select">
-                <option value="">— Selecione —</option>
-              </select></div>
-            <div class="mb-3"><label class="form-label">Ano</label>
-              <input id="turma-ano" class="form-control" placeholder="Ex: 2025"/></div>
-            <button class="btn btn-primary w-100" onclick="addTurma()">
-              <i class="bi bi-plus-lg me-1"></i> Cadastrar Turma
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header"><i class="bi bi-collection-fill me-1"></i> Turmas Cadastradas</div>
-          <div class="card-body p-0">
-            <table class="table mb-0" id="tbl-turmas">
-              <thead><tr><th>Turma</th><th>Curso</th><th>Ano</th><th>Alunos</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== ASSOCIAR ===================== -->
-  <div class="page" id="page-associar">
-    <ul class="nav nav-tabs tab-assoc mb-3" id="tabs-assoc">
-      <li class="nav-item"><a class="nav-link active" href="#" data-tab="assoc-turma">Alunos por Turma</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-tab="assoc-individual">Aluno Individual</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-tab="assoc-materia-turma">Matéria para Turma</a></li>
-    </ul>
-
-    <!-- Tab: Alunos por turma -->
-    <div id="assoc-turma" class="tab-content-item">
-      <div class="row g-3">
-        <div class="col-md-5">
-          <div class="card">
-            <div class="card-header"><i class="bi bi-collection-fill me-1"></i> Selecionar Turma</div>
-            <div class="card-body">
-              <div class="mb-3"><label class="form-label">Turma</label>
-                <select id="assoc-turma-sel" class="form-select" onchange="carregarTurmaAlunos()">
-                  <option value="">— Selecione uma turma —</option>
-                </select></div>
-              <div id="assoc-turma-info" style="display:none">
-                <p class="text-muted" style="font-size:.83rem">Curso: <strong id="assoc-turma-curso-nome"></strong></p>
-                <label class="form-label">Adicionar Aluno à Turma</label>
-                <select id="assoc-turma-aluno-sel" class="form-select mb-2">
-                  <option value="">— Selecione aluno —</option>
-                </select>
-                <button class="btn btn-primary w-100" onclick="addAlunoTurma()">
-                  <i class="bi bi-plus-lg me-1"></i> Adicionar à Turma
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-7">
-          <div class="card">
-            <div class="card-header"><i class="bi bi-people-fill me-1"></i> Alunos na Turma</div>
-            <div class="card-body p-0">
-              <table class="table mb-0" id="tbl-turma-alunos">
-                <thead><tr><th>Matrícula</th><th>Nome</th><th>Matérias</th><th></th></tr></thead>
-                <tbody><tr><td colspan="4" class="text-center text-muted py-3">Selecione uma turma</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab: Aluno individual -->
-    <div id="assoc-individual" class="tab-content-item" style="display:none">
-      <div class="row g-3">
-        <div class="col-md-4">
-          <div class="card">
-            <div class="card-header"><i class="bi bi-person-plus me-1"></i> Associar Matéria</div>
-            <div class="card-body">
-              <div class="mb-2"><label class="form-label">Aluno</label>
-                <select id="assoc-aluno-sel" class="form-select" onchange="carregarMatAluno()">
-                  <option value="">— Selecione —</option>
-                </select></div>
-              <div class="mb-3"><label class="form-label">Matéria</label>
-                <select id="assoc-mat-sel" class="form-select"><option value="">— Selecione —</option></select></div>
-              <button class="btn btn-primary w-100" onclick="assocMateria()">
-                <i class="bi bi-link-45deg me-1"></i> Associar
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-8">
-          <div class="card">
-            <div class="card-header"><i class="bi bi-book-fill me-1"></i> Matérias do Aluno Selecionado</div>
-            <div class="card-body p-0">
-              <table class="table mb-0" id="tbl-mat-aluno">
-                <thead><tr><th>Matéria</th><th>Curso</th><th>Professor</th><th></th></tr></thead>
-                <tbody><tr><td colspan="4" class="text-center text-muted py-3">Selecione um aluno</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab: Matéria para turma -->
-    <div id="assoc-materia-turma" class="tab-content-item" style="display:none">
-      <div class="card" style="max-width:500px">
-        <div class="card-header"><i class="bi bi-collection me-1"></i> Adicionar Matéria a Todos da Turma</div>
-        <div class="card-body">
-          <p class="text-muted" style="font-size:.85rem">
-            Essa ação associa a matéria escolhida a <strong>todos os alunos</strong> que estão na turma selecionada.
-          </p>
-          <div class="mb-2"><label class="form-label">Turma</label>
-            <select id="assoc-matturma-turma" class="form-select">
-              <option value="">— Selecione —</option>
-            </select></div>
-          <div class="mb-3"><label class="form-label">Matéria</label>
-            <select id="assoc-matturma-mat" class="form-select">
-              <option value="">— Selecione —</option>
-            </select></div>
-          <button class="btn btn-success w-100" onclick="assocMateriaTurma()">
-            <i class="bi bi-check-all me-1"></i> Aplicar para toda a turma
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== CHAMADA ===================== -->
-  <div class="page" id="page-chamada">
-    <div class="card mb-3" style="max-width:480px">
-      <div class="card-body">
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label">Matéria</label>
-            <select id="ch-mat" class="form-select"><option value="">— Selecione —</option></select>
-          </div>
-          <div class="col-6">
-            <label class="form-label">Data</label>
-            <input type="date" id="ch-data" class="form-control"/>
-          </div>
-        </div>
-        <button class="btn btn-primary mt-3 w-100" onclick="carregarChamada()">
-          <i class="bi bi-search me-1"></i> Carregar Alunos
-        </button>
-      </div>
-    </div>
-    <div class="card" id="card-chamada" style="display:none">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-calendar-check-fill me-1"></i> Lista de Chamada</span>
-        <div>
-          <button class="btn btn-sm btn-outline-success me-1" onclick="marcarTodos(true)">Todos Presentes</button>
-          <button class="btn btn-sm btn-outline-danger" onclick="marcarTodos(false)">Todos Faltaram</button>
-        </div>
-      </div>
-      <div class="card-body p-0">
-        <table class="table mb-0" id="tbl-chamada">
-          <thead><tr><th>Matrícula</th><th>Aluno</th><th>Presença</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="card-footer text-end">
-        <button class="btn btn-primary" onclick="salvarChamada()">
-          <i class="bi bi-floppy-fill me-1"></i> Salvar Chamada
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== NOTAS ===================== -->
-  <div class="page" id="page-notas">
-    <div class="card mb-3" style="max-width:400px">
-      <div class="card-body">
-        <label class="form-label">Matéria</label>
-        <select id="nt-mat" class="form-select mb-3"><option value="">— Selecione —</option></select>
-        <button class="btn btn-primary w-100" onclick="carregarNotas()">
-          <i class="bi bi-search me-1"></i> Carregar Alunos
-        </button>
-      </div>
-    </div>
-    <div class="card" id="card-notas" style="display:none">
-      <div class="card-header"><i class="bi bi-clipboard2-data-fill me-1"></i> Lançamento de Notas</div>
-      <div class="card-body p-0">
-        <table class="table mb-0" id="tbl-notas">
+    <div class="card">
+      <h3>Associações ativas</h3>
+      <div class="table-container">
+        <table id="t-assoc">
           <thead>
             <tr>
               <th>Aluno</th>
-              <th>AV1</th><th>AV2</th><th>AV3</th><th>Média</th>
+              <th>Matéria</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody>
+            <tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma associação ativa.</td></tr>
+          </tbody>
         </table>
-      </div>
-      <div class="card-footer text-end">
-        <button class="btn btn-primary" onclick="salvarNotas()">
-          <i class="bi bi-floppy-fill me-1"></i> Salvar Notas
-        </button>
       </div>
     </div>
   </div>
-</div><!-- /main -->
 
-<!-- TOAST -->
-<div id="toast-container"></div>
+  <!-- SEÇÃO: CHAMADA -->
+  <div id="sec-chamada" class="section">
+    <h2 class="section-title">Chamada</h2>
+    <div class="card">
+      <h3>Registrar chamada</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="ch-mat" onchange="loadChamada()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group small">
+          <input type="date" id="ch-data">
+        </div>
+        <button class="btn btn-primary" onclick="salvarChamada()"><i class="ti ti-device-floppy"></i> Salvar</button>
+      </div>
+      <div class="msg" id="ch-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Presença</h3>
+      <div id="ch-lista" style="color:#94a3b8">Selecione uma matéria para ver os alunos.</div>
+    </div>
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SEÇÃO: NOTAS -->
+  <div id="sec-notas" class="section">
+    <h2 class="section-title">Notas</h2>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="nt-mat">Matéria</label>
+          <select id="nt-mat" onchange="loadNotas()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="nt-aval">Nova avaliação</label>
+          <input id="nt-aval" placeholder="Atividade 3">
+        </div>
+        <div style="flex: 0 0 auto;">
+          <button class="btn btn-blue" onclick="addAvaliacao()"><i class="ti ti-plus"></i> Adicionar</button>
+        </div>
+      </div>
+      <div class="msg" id="nt-msg"></div>
+    </div>
+    <div id="nt-lista" style="color:#94a3b8">Selecione uma matéria para lançar notas.</div>
+  </div>
+
+  <!-- SEÇÃO: BOLETIM -->
+  <div id="sec-boletim" class="section">
+    <h2 class="section-title">Boletim</h2>
+    <div class="card">
+      <h3>Boletim por aluno</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="bl-aluno" onchange="loadBoletim()">
+            <option value="">Selecione o aluno</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="bl-conteudo"></div>
+  </div>
+
+  <!-- SEÇÃO: DIÁRIO -->
+  <div id="sec-diario" class="section">
+    <h2 class="section-title">Diário</h2>
+    <div class="card">
+      <h3>Logotipo da instituição</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Aparece no topo de todo Diário exportado. Aceita PNG ou JPG, até 2MB.
+      </p>
+      <div id="lg-preview" style="margin-bottom:12px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="file" id="lg-arquivo" accept="image/png,image/jpeg">
+        </div>
+        <button class="btn btn-primary" onclick="enviarLogo()"><i class="ti ti-upload"></i> Enviar logotipo</button>
+        <button class="btn btn-blue" id="lg-remover" onclick="removerLogo()" style="display:none"><i class="ti ti-trash"></i> Remover</button>
+      </div>
+      <div class="msg" id="lg-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Exportar Diário de Classe</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Gera uma planilha (.xlsx) com a lista de alunos, frequência, avaliações, médias e faltas da turma/matéria escolhida.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="dr-turma">
+            <option value="">Selecione a turma</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="dr-materia">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="dr-instituicao" placeholder="Instituição (opcional)">
+        </div>
+        <div class="form-group">
+          <input id="dr-curso" placeholder="Curso (opcional)">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="baixarDiario()"><i class="ti ti-download"></i> Baixar Diário (.xlsx)</button>
+      <div class="msg" id="dr-msg"></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: BACKUP -->
+  <div id="sec-backup" class="section">
+    <h2 class="section-title">Backup</h2>
+    <div class="card">
+      <h3>Exportar backup</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Gera um arquivo (.json) com todos os dados do sistema: alunos, turmas, matérias, chamadas, notas, conteúdos lecionados e logotipo. Guarde esse arquivo em local seguro — ele também contém as credenciais de acesso (de forma protegida).
+      </p>
+      <button class="btn btn-primary" onclick="baixarBackup()"><i class="ti ti-download"></i> Baixar backup (.json)</button>
+    </div>
+    <div class="card">
+      <h3>Restaurar backup</h3>
+      <p style="font-size:13px; color:#ef4444; margin-bottom:14px">
+        <strong>Atenção:</strong> restaurar um backup substitui TODOS os dados atuais (alunos, turmas, notas, chamadas etc.) pelo que estiver salvo no arquivo. Essa ação não pode ser desfeita.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <input type="file" id="bk-arquivo" accept="application/json,.json">
+        </div>
+        <button class="btn btn-blue" onclick="restaurarBackup()"><i class="ti ti-upload"></i> Restaurar backup</button>
+      </div>
+      <div class="msg" id="bk-msg"></div>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL EDITAR ALUNO -->
+<div class="modal-bg" id="modal-editar" style="display:none">
+  <div class="modal">
+    <h3>Editar aluno</h3>
+    <input id="edit-nome" placeholder="Novo nome">
+    <select id="edit-turma" style="margin-top:10px">
+      <option value="">Sem turma</option>
+    </select>
+    <div class="msg" id="edit-msg"></div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn" style="background:#f1f5f9; color:#475569" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-senha" style="display:none">
+  <div class="modal">
+    <h3>Trocar senha</h3>
+    <input id="sn-atual" type="password" placeholder="Senha atual" style="margin-bottom:10px">
+    <input id="sn-nova" type="password" placeholder="Nova senha (mín. 6 caracteres)" style="margin-bottom:10px">
+    <input id="sn-confirmar" type="password" placeholder="Confirmar nova senha">
+    <div class="msg" id="sn-msg"></div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn" style="background:#f1f5f9; color:#475569" onclick="fecharModalSenha()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarSenha()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ─────────────────────────────────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────────────────────────────────
-let D = { alunos:{}, materias:{}, cursos:{}, professores:{}, turmas:{} };
-let profSelecionado = null; // { id, nome }
+let dados={alunos:{},materias:{},turmas:{}};
+let editandoId=null;
+let currentEvaluations=[];
 
-// ─────────────────────────────────────────────────────────────────────────
-// UTILS
-// ─────────────────────────────────────────────────────────────────────────
-function toast(msg, tipo='ok') {
-  const c = document.getElementById('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast-msg ${tipo}`;
-  el.innerHTML = `<i class="bi bi-${tipo==='ok'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
-  c.appendChild(el);
-  setTimeout(()=>el.remove(), 3200);
-}
-
-async function api(url, method='GET', body=null) {
-  const opts = { method, headers:{'Content-Type':'application/json'} };
-  if(body) opts.body = JSON.stringify(body);
-  const r = await fetch(url, opts);
+async function api(url,method='GET',body=null){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  const r=await fetch(url,opts);
   return r.json();
 }
 
-function nomeCurso(id) {
-  return id && D.cursos[id] ? D.cursos[id].nome : '—';
-}
-
-function turmasDoAluno(mat) {
-  return Object.values(D.turmas)
-    .filter(t=>t.alunos.includes(mat))
-    .map(t=>t.nome)
-    .join(', ') || '—';
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// CARREGAR DADOS
-// ─────────────────────────────────────────────────────────────────────────
-async function carregarDados() {
-  const r = await api('/api/dados');
-  D.alunos      = r.alunos      || {};
-  D.materias    = r.materias    || {};
-  D.cursos      = r.cursos      || {};
-  D.professores = r.professores || {};
-  D.turmas      = r.turmas      || {};
-  renderAll();
-}
-
-function renderAll() {
-  renderDashboard();
-  renderCursos();
-  renderMaterias();
-  renderProfessores();
+async function refresh(){
+  dados=await api('/api/dados');
   renderAlunos();
   renderTurmas();
-  popularSelects();
+  renderMaterias();
+  renderAssoc();
+  populateSelects();
+  renderConteudos();
+  renderLogoPreview();
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// DASHBOARD
-// ─────────────────────────────────────────────────────────────────────────
-function renderDashboard() {
-  document.getElementById('stat-cursos').textContent     = Object.keys(D.cursos).length;
-  document.getElementById('stat-materias').textContent   = Object.keys(D.materias).length;
-  document.getElementById('stat-professores').textContent= Object.keys(D.professores).length;
-  document.getElementById('stat-alunos').textContent     = Object.keys(D.alunos).length;
-  document.getElementById('stat-turmas').textContent     = Object.keys(D.turmas).length;
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('sec-'+id).classList.add('active');
+  if(id==='boletim') loadBoletim();
+  if(id==='notas') loadNotas();
+  if(id==='chamada') loadChamada();
+}
 
-  const tbody = document.querySelector('#tbl-dash-alunos tbody');
-  tbody.innerHTML = '';
-  if(!Object.keys(D.alunos).length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum aluno cadastrado</td></tr>';
-    return;
-  }
-  Object.entries(D.alunos).forEach(([mat,a])=>{
-    const turmas = turmasDoAluno(mat);
-    const mats   = (a.materias||[]).map(m=>`<span class="badge-mat">${m}</span>`).join(' ') || '—';
-    tbody.innerHTML += `<tr>
-      <td><code>${mat}</code></td>
-      <td>${a.nome}</td>
-      <td>${turmas}</td>
-      <td>${mats}</td>
-    </tr>`;
+function calcMedia(notas){
+  const vals=Object.values(notas).map(Number).filter(v=>!isNaN(v));
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+}
+
+function alunosOrdenados(){
+  return Object.entries(dados.alunos).sort((a,b)=>{
+    const ta=a[1].turma||'\uffff';
+    const tb=b[1].turma||'\uffff';
+    const cmpTurma=ta.localeCompare(tb,'pt-BR');
+    if(cmpTurma!==0) return cmpTurma;
+    return a[1].nome.localeCompare(b[1].nome,'pt-BR');
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// CURSOS
-// ─────────────────────────────────────────────────────────────────────────
-async function addCurso() {
-  const nome = document.getElementById('curso-nome').value.trim();
-  const desc = document.getElementById('curso-desc').value.trim();
-  if(!nome) return toast('Informe o nome do curso.','erro');
-  const r = await api('/api/cursos','POST',{nome,descricao:desc});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Curso cadastrado!');
-  document.getElementById('curso-nome').value='';
-  document.getElementById('curso-desc').value='';
-  carregarDados();
+function turmaLabel(t){
+  return t?t:'Sem turma';
 }
 
-async function delCurso(id) {
-  if(!confirm('Excluir este curso?')) return;
-  const r = await api(`/api/cursos/${id}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Curso excluído.');
-  carregarDados();
+// Agrupa uma lista já ordenada de alunos por turma, chamando onGroup() ao iniciar
+// cada novo grupo e onItem() para cada aluno. Mantém a função de renderização
+// específica de cada tela (tabela, lista de checkboxes etc.) desacoplada do agrupamento.
+function agruparPorTurma(rows,onGroup,onItem){
+  let turmaAtual=null;
+  rows.forEach(([mat,a])=>{
+    const turmaAluno=a.turma||'';
+    if(turmaAluno!==turmaAtual){
+      turmaAtual=turmaAluno;
+      onGroup(turmaLabel(turmaAluno));
+    }
+    onItem(mat,a);
+  });
 }
 
-function renderCursos() {
-  const tbody = document.querySelector('#tbl-cursos tbody');
-  tbody.innerHTML='';
-  if(!Object.keys(D.cursos).length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhum curso cadastrado</td></tr>';
-    return;
-  }
-  Object.entries(D.cursos).forEach(([id,c])=>{
-    const qtdMats = Object.values(D.materias).filter(m=>m.curso_id===id).length;
-    tbody.innerHTML+=`<tr>
-      <td><strong>${c.nome}</strong></td>
-      <td>${c.descricao||'—'}</td>
-      <td><span class="badge-mat">${qtdMats} matéria(s)</span></td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="delCurso('${id}')"><i class="bi bi-trash"></i></button>
+function linhaAluno(mat,a){
+  return `
+    <tr>
+      <td class="font-medium">${a.nome}</td>
+      <td>${a.turma?`<span class="badge">${a.turma}</span>`:'—'}</td>
+      <td>${(a.materias||[]).map(m=>`<span class="badge">${m}</span>`).join('')||'—'}</td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        <button class="btn-icon btn-edit" onclick="abrirModal('${mat}','${a.nome.replace(/'/g,"\\'")}','${(a.turma||'').replace(/'/g,"\\'")}')"><i class="ti ti-pencil"></i></button>
+        <button class="btn-icon btn-delete" onclick="delAluno('${mat}')"><i class="ti ti-trash"></i></button>
       </td>
     </tr>`;
-  });
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// MATÉRIAS
-// ─────────────────────────────────────────────────────────────────────────
-async function addMateria() {
-  const nome     = document.getElementById('mat-nome').value.trim();
-  const professor= document.getElementById('mat-prof').value.trim();
-  const curso_id = document.getElementById('mat-curso').value;
-  if(!nome) return toast('Informe o nome da matéria.','erro');
-  const r = await api('/api/materias','POST',{nome,professor,curso_id});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Matéria cadastrada!');
-  document.getElementById('mat-nome').value='';
-  document.getElementById('mat-prof').value='';
-  document.getElementById('mat-curso').value='';
-  carregarDados();
-}
-
-async function delMateria(nome) {
-  if(!confirm(`Excluir "${nome}"?`)) return;
-  const r = await api(`/api/materias/${encodeURIComponent(nome)}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Matéria excluída.');
-  carregarDados();
-}
-
-function renderMaterias() {
-  const tbody = document.querySelector('#tbl-materias tbody');
-  tbody.innerHTML='';
-  if(!Object.keys(D.materias).length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhuma matéria cadastrada</td></tr>';
+function renderAlunos(){
+  const tb=document.querySelector('#t-alunos tbody');
+  const filtro=document.getElementById('f-turma')?.value||'';
+  let rows=alunosOrdenados();
+  if(filtro) rows=rows.filter(([,a])=>(a.turma||'')===filtro);
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>';
     return;
   }
-  Object.entries(D.materias).forEach(([nome,m])=>{
-    tbody.innerHTML+=`<tr>
-      <td><strong>${nome}</strong></td>
-      <td><span class="badge-curso">${nomeCurso(m.curso_id)}</span></td>
+  let html='';
+  if(filtro){
+    // Já filtrado por uma única turma: cabeçalho de grupo seria redundante
+    rows.forEach(([mat,a])=>{ html+=linhaAluno(mat,a); });
+  }else{
+    agruparPorTurma(rows,
+      (label)=>{ html+=`<tr class="group-row"><td colspan="4">${label}</td></tr>`; },
+      (mat,a)=>{ html+=linhaAluno(mat,a); }
+    );
+  }
+  tb.innerHTML=html;
+}
+
+function renderTurmas(){
+  const tb=document.querySelector('#t-turmas tbody');
+  const nomes=Object.keys(dados.turmas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!nomes.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma turma cadastrada.</td></tr>';
+    return;
+  }
+  tb.innerHTML=nomes.map(nome=>{
+    const qtd=alunosOrdenados().filter(([,a])=>a.turma===nome).length;
+    return `
+    <tr>
+      <td class="font-medium">${nome}</td>
+      <td>${qtd}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="delTurma('${nome.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `}).join('');
+}
+
+function renderMaterias(){
+  const tb=document.querySelector('#t-materias tbody');
+  const rows=Object.entries(dados.materias);
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma matéria cadastrada.</td></tr>';
+    return;
+  }
+  tb.innerHTML=rows.map(([nome,m])=>`
+    <tr>
+      <td class="font-medium">${nome}</td>
       <td>${m.professor||'—'}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="delMateria('${nome.replace(/'/g,"\\'")}')"><i class="bi bi-trash"></i></button>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button>
       </td>
-    </tr>`;
-  });
+    </tr>
+  `).join('');
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// PROFESSORES
-// ─────────────────────────────────────────────────────────────────────────
-async function addProfessor() {
-  const nome  = document.getElementById('prof-nome').value.trim();
-  const email = document.getElementById('prof-email').value.trim();
-  if(!nome) return toast('Informe o nome do professor.','erro');
-  const r = await api('/api/professores','POST',{nome,email});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Professor cadastrado!');
-  document.getElementById('prof-nome').value='';
-  document.getElementById('prof-email').value='';
-  carregarDados();
-}
-
-function selecionarProf(id, nome) {
-  profSelecionado = {id, nome};
-  document.getElementById('prof-sel-nome').textContent = nome;
-  document.getElementById('card-atribuir-mat').style.display='block';
-  // preenche select de matérias disponíveis
-  const sel = document.getElementById('prof-mat-sel');
-  sel.innerHTML='<option value="">— Selecione —</option>';
-  Object.keys(D.materias).forEach(m=>{
-    sel.innerHTML+=`<option value="${m}">${m}</option>`;
-  });
-}
-
-async function atribuirMatProf() {
-  if(!profSelecionado) return;
-  const materia = document.getElementById('prof-mat-sel').value;
-  if(!materia) return toast('Selecione uma matéria.','erro');
-  const r = await api(`/api/professores/${profSelecionado.id}/materias`,'POST',{materia});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Matéria atribuída!');
-  carregarDados();
-}
-
-async function desatribuirMatProf(profId, materia) {
-  const r = await api(`/api/professores/${profId}/materias/${encodeURIComponent(materia)}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Atribuição removida.');
-  carregarDados();
-}
-
-async function delProfessor(id) {
-  if(!confirm('Excluir este professor?')) return;
-  const r = await api(`/api/professores/${id}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Professor excluído.');
-  if(profSelecionado && profSelecionado.id===id) {
-    profSelecionado=null;
-    document.getElementById('card-atribuir-mat').style.display='none';
-  }
-  carregarDados();
-}
-
-function renderProfessores() {
-  const tbody = document.querySelector('#tbl-professores tbody');
-  tbody.innerHTML='';
-  if(!Object.keys(D.professores).length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhum professor cadastrado</td></tr>';
+function renderAssoc(){
+  const tb=document.querySelector('#t-assoc tbody');
+  const rows=[];
+  alunosOrdenados().forEach(([mat,a])=>(a.materias||[]).forEach(m=>rows.push({mat,nome:a.nome,materia:m})));
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="3" style="color:#94a3b8" class="text-center">Nenhuma associação ativa.</td></tr>';
     return;
   }
-  Object.entries(D.professores).forEach(([id,p])=>{
-    const mats = (p.materias||[]).map(m=>
-      `<span class="badge-mat">${m} <a href="#" onclick="desatribuirMatProf('${id}','${m.replace(/'/g,"\\'")}');return false;" class="text-danger ms-1"><i class="bi bi-x-sm"></i></a></span>`
-    ).join(' ') || '<span class="text-muted">—</span>';
-    tbody.innerHTML+=`<tr>
-      <td><strong>${p.nome}</strong></td>
-      <td>${p.email||'—'}</td>
-      <td>${mats}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-primary me-1" onclick="selecionarProf('${id}','${p.nome.replace(/'/g,"\\'")}')">
-          <i class="bi bi-link-45deg"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-danger" onclick="delProfessor('${id}')"><i class="bi bi-trash"></i></button>
+  tb.innerHTML=rows.map(r=>`
+    <tr>
+      <td class="font-medium">${r.nome}</td>
+      <td>${r.materia}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" onclick="desassoc('${r.mat}','${r.materia}')"><i class="ti ti-x"></i></button>
       </td>
-    </tr>`;
+    </tr>
+  `).join('');
+}
+
+function opcoesAlunosAgrupadas(alunos){
+  let html='';
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<optgroup label="${label}">`; },
+    (mat,a)=>{ html+=`<option value="${mat}">${a.nome}</option>`; }
+  );
+  return html;
+}
+
+function populateSelects(){
+  const alunos=alunosOrdenados();
+  const mats=Object.keys(dados.materias);
+  const turmas=Object.keys(dados.turmas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  ['as-aluno','bl-aluno','att-aluno'].forEach(id=>{
+    const s=document.getElementById(id);
+    const v=s.value;
+    s.innerHTML='<option value="">Selecione o aluno</option>'+opcoesAlunosAgrupadas(alunos);
+    s.value=v;
   });
+  ['as-mat','ch-mat','nt-mat','dr-materia','cl-mat'].forEach(id=>{
+    const s=document.getElementById(id);
+    const v=s.value;
+    s.innerHTML='<option value="">Selecione a matéria</option>'+mats.map(m=>`<option value="${m}">${m}</option>`).join('');
+    s.value=v;
+  });
+  const s=document.getElementById('a-turma');
+  const v1=s.value;
+  s.innerHTML='<option value="">Sem turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  s.value=v1;
+
+  const fs=document.getElementById('f-turma');
+  const v2=fs.value;
+  fs.innerHTML='<option value="">Todas as turmas</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  fs.value=v2;
+
+  const ts=document.getElementById('att-turma');
+  const v3=ts.value;
+  ts.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  ts.value=v3;
+
+  const drs=document.getElementById('dr-turma');
+  const v4=drs.value;
+  drs.innerHTML='<option value="">Selecione a turma</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  drs.value=v4;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// ALUNOS
-// ─────────────────────────────────────────────────────────────────────────
-async function addAluno() {
-  const nome = document.getElementById('aluno-nome').value.trim();
-  if(!nome) return toast('Informe o nome do aluno.','erro');
-  const r = await api('/api/alunos','POST',{nome});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Aluno cadastrado!');
-  document.getElementById('aluno-nome').value='';
-  carregarDados();
+function abrirModal(id,nome,turma){
+  editandoId=id;
+  document.getElementById('edit-nome').value=nome;
+  document.getElementById('edit-turma').value=turma||'';
+  document.getElementById('edit-msg').textContent='';
+  document.getElementById('modal-editar').style.display='flex';
 }
 
-async function delAluno(mat) {
-  if(!confirm('Excluir este aluno?')) return;
-  const r = await api(`/api/alunos/${mat}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Aluno excluído.');
-  carregarDados();
+function fecharModal(){
+  editandoId=null;
+  document.getElementById('modal-editar').style.display='none';
 }
 
-function renderAlunos() {
-  const tbody = document.querySelector('#tbl-alunos tbody');
-  tbody.innerHTML='';
-  if(!Object.keys(D.alunos).length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhum aluno cadastrado</td></tr>';
+function abrirModalSenha(){
+  document.getElementById('sn-atual').value='';
+  document.getElementById('sn-nova').value='';
+  document.getElementById('sn-confirmar').value='';
+  document.getElementById('sn-msg').textContent='';
+  document.getElementById('modal-senha').style.display='flex';
+}
+
+function fecharModalSenha(){
+  document.getElementById('modal-senha').style.display='none';
+}
+
+async function salvarSenha(){
+  const atual=document.getElementById('sn-atual').value;
+  const nova=document.getElementById('sn-nova').value;
+  const confirmar=document.getElementById('sn-confirmar').value;
+  const msg=document.getElementById('sn-msg');
+  if(!atual||!nova||!confirmar){
+    msg.style.color='#ef4444';
+    msg.textContent='Preencha todos os campos.';
     return;
   }
-  Object.entries(D.alunos).forEach(([mat,a])=>{
-    const mats=(a.materias||[]).map(m=>`<span class="badge-mat">${m}</span>`).join(' ')||'—';
-    tbody.innerHTML+=`<tr>
-      <td><code>${mat}</code></td>
-      <td>${a.nome}</td>
-      <td>${mats}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="delAluno('${mat}')"><i class="bi bi-trash"></i></button>
-      </td>
-    </tr>`;
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// TURMAS
-// ─────────────────────────────────────────────────────────────────────────
-async function addTurma() {
-  const nome     = document.getElementById('turma-nome').value.trim();
-  const curso_id = document.getElementById('turma-curso').value;
-  const ano      = document.getElementById('turma-ano').value.trim();
-  if(!nome) return toast('Informe o nome da turma.','erro');
-  const r = await api('/api/turmas','POST',{nome,curso_id,ano});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Turma cadastrada!');
-  document.getElementById('turma-nome').value='';
-  document.getElementById('turma-ano').value='';
-  carregarDados();
-}
-
-async function delTurma(id) {
-  if(!confirm('Excluir esta turma?')) return;
-  const r = await api(`/api/turmas/${id}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Turma excluída.');
-  carregarDados();
-}
-
-function renderTurmas() {
-  const tbody = document.querySelector('#tbl-turmas tbody');
-  tbody.innerHTML='';
-  if(!Object.keys(D.turmas).length) {
-    tbody.innerHTML='<tr><td colspan="5" class="text-center text-muted py-3">Nenhuma turma cadastrada</td></tr>';
+  if(nova.length<6){
+    msg.style.color='#ef4444';
+    msg.textContent='A nova senha deve ter pelo menos 6 caracteres.';
     return;
   }
-  Object.entries(D.turmas).forEach(([id,t])=>{
-    tbody.innerHTML+=`<tr>
-      <td><strong>${t.nome}</strong></td>
-      <td><span class="badge-curso">${nomeCurso(t.curso_id)}</span></td>
-      <td>${t.ano||'—'}</td>
-      <td>${(t.alunos||[]).length} aluno(s)</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="delTurma('${id}')"><i class="bi bi-trash"></i></button>
-      </td>
-    </tr>`;
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// ASSOCIAR — TAB TURMA
-// ─────────────────────────────────────────────────────────────────────────
-function carregarTurmaAlunos() {
-  const turmaId = document.getElementById('assoc-turma-sel').value;
-  const info    = document.getElementById('assoc-turma-info');
-  const tbody   = document.querySelector('#tbl-turma-alunos tbody');
-
-  if(!turmaId) {
-    info.style.display='none';
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Selecione uma turma</td></tr>';
+  if(nova!==confirmar){
+    msg.style.color='#ef4444';
+    msg.textContent='As senhas não coincidem.';
     return;
   }
+  const r=await api('/api/trocar-senha','POST',{senha_atual:atual,nova_senha:nova});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Senha alterada com sucesso!';
+    setTimeout(fecharModalSenha,1500);
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
 
-  const turma = D.turmas[turmaId];
-  document.getElementById('assoc-turma-curso-nome').textContent = nomeCurso(turma.curso_id);
-  info.style.display='block';
-
-  // Preenche select de alunos NÃO na turma
-  const sel = document.getElementById('assoc-turma-aluno-sel');
-  sel.innerHTML='<option value="">— Selecione aluno —</option>';
-  const nasTurma = new Set(turma.alunos||[]);
-  Object.entries(D.alunos).forEach(([mat,a])=>{
-    if(!nasTurma.has(mat))
-      sel.innerHTML+=`<option value="${mat}">${a.nome} (${mat})</option>`;
-  });
-
-  // Renderiza tabela de alunos na turma
-  tbody.innerHTML='';
-  if(!turma.alunos||!turma.alunos.length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhum aluno nesta turma</td></tr>';
+async function salvarEdicao(){
+  const nome=document.getElementById('edit-nome').value.trim();
+  const turma=document.getElementById('edit-turma').value;
+  if(!nome){
+    document.getElementById('edit-msg').style.color='#ef4444';
+    document.getElementById('edit-msg').textContent='Nome não pode ser vazio.';
     return;
   }
-  turma.alunos.forEach(mat=>{
-    const aluno = D.alunos[mat];
-    if(!aluno) return;
-    const mats=(aluno.materias||[]).map(m=>`<span class="badge-mat">${m}</span>`).join(' ')||'—';
-    tbody.innerHTML+=`<tr>
-      <td><code>${mat}</code></td>
-      <td>${aluno.nome}</td>
-      <td>${mats}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="removeAlunoTurma('${turmaId}','${mat}')">
-          <i class="bi bi-person-x"></i>
-        </button>
-      </td>
-    </tr>`;
-  });
+  const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome,turma});
+  if(r.ok){
+    fecharModal();
+    refresh();
+  }else{
+    document.getElementById('edit-msg').style.color='#ef4444';
+    document.getElementById('edit-msg').textContent=r.erro;
+  }
 }
 
-async function addAlunoTurma() {
-  const turmaId  = document.getElementById('assoc-turma-sel').value;
-  const matricula= document.getElementById('assoc-turma-aluno-sel').value;
-  if(!turmaId||!matricula) return toast('Selecione turma e aluno.','erro');
-  const r = await api(`/api/turmas/${turmaId}/alunos`,'POST',{matricula});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Aluno adicionado à turma!');
-  await carregarDados();
-  carregarTurmaAlunos();
+async function addAluno(){
+  const nome=document.getElementById('a-nome').value.trim();
+  const turma=document.getElementById('a-turma').value;
+  const r=await api('/api/alunos','POST',{nome,turma});
+  const msg=document.getElementById('a-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Aluno cadastrado com sucesso!';
+    document.getElementById('a-nome').value='';
+    document.getElementById('a-turma').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
 }
 
-async function removeAlunoTurma(turmaId, matricula) {
-  if(!confirm('Remover aluno desta turma?')) return;
-  const r = await api(`/api/turmas/${turmaId}/alunos/${matricula}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Aluno removido da turma.');
-  await carregarDados();
-  carregarTurmaAlunos();
+async function delAluno(mat){
+  if(!confirm('Excluir este aluno?'))return;
+  await api('/api/alunos/'+encodeURIComponent(mat),'DELETE');
+  refresh();
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// ASSOCIAR — TAB INDIVIDUAL
-// ─────────────────────────────────────────────────────────────────────────
-function carregarMatAluno() {
-  const mat = document.getElementById('assoc-aluno-sel').value;
-  const tbody = document.querySelector('#tbl-mat-aluno tbody');
-  if(!mat) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Selecione um aluno</td></tr>';
+async function addTurma(){
+  const nome=document.getElementById('t-nome').value.trim();
+  const r=await api('/api/turmas','POST',{nome});
+  const msg=document.getElementById('t-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Turma cadastrada com sucesso!';
+    document.getElementById('t-nome').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delTurma(nome){
+  if(!confirm('Excluir esta turma? Os alunos vinculados ficarão sem turma.'))return;
+  await api('/api/turmas/'+encodeURIComponent(nome),'DELETE');
+  refresh();
+}
+
+async function associarTurma(){
+  const mat=document.getElementById('att-aluno').value;
+  const turma=document.getElementById('att-turma').value;
+  if(!mat||!turma){
+    document.getElementById('att-msg').style.color='#ef4444';
+    document.getElementById('att-msg').textContent='Selecione aluno e turma.';
     return;
   }
-  const aluno = D.alunos[mat];
-  tbody.innerHTML='';
-  if(!aluno.materias||!aluno.materias.length) {
-    tbody.innerHTML='<tr><td colspan="4" class="text-center text-muted py-3">Nenhuma matéria associada</td></tr>';
+  const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/turma','POST',{turma});
+  const msg=document.getElementById('att-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Associação realizada!';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function addMateria(){
+  const nome=document.getElementById('m-nome').value.trim();
+  const prof=document.getElementById('m-prof').value.trim();
+  const r=await api('/api/materias','POST',{nome,professor:prof});
+  const msg=document.getElementById('m-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Matéria cadastrada com sucesso!';
+    document.getElementById('m-nome').value='';
+    document.getElementById('m-prof').value='';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delMateria(nome){
+  if(!confirm('Excluir esta matéria?'))return;
+  await api('/api/materias/'+encodeURIComponent(nome),'DELETE');
+  refresh();
+}
+
+function _fmtDataBR(data){
+  const [y,m,dia]=data.split('-');
+  return `${dia}/${m}/${y}`;
+}
+
+function renderConteudos(){
+  const materia=document.getElementById('cl-mat')?.value;
+  const div=document.getElementById('cl-lista');
+  if(!div) return;
+  if(!materia){
+    div.innerHTML='';
     return;
   }
-  aluno.materias.forEach(m=>{
-    const md = D.materias[m]||{};
-    tbody.innerHTML+=`<tr>
-      <td>${m}</td>
-      <td><span class="badge-curso">${nomeCurso(md.curso_id)}</span></td>
-      <td>${md.professor||'—'}</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" onclick="desassocMateria('${mat}','${m.replace(/'/g,"\\'")}')">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </td>
-    </tr>`;
-  });
+  const conteudos=dados.materias[materia]?.conteudos||{};
+  const entradas=Object.entries(conteudos).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entradas.length){
+    div.innerHTML='<div style="color:#94a3b8; font-size:13px; text-align:center; padding:1rem">Nenhum conteúdo registrado ainda para esta matéria.</div>';
+    return;
+  }
+  div.innerHTML=entradas.map(([data,texto])=>`
+    <div class="conteudo-item">
+      <div class="conteudo-item-header">
+        <strong>${_fmtDataBR(data)}</strong>
+        <button class="btn-icon btn-delete" onclick="delConteudo('${materia}','${data}')"><i class="ti ti-trash"></i></button>
+      </div>
+      <div class="conteudo-item-texto">${texto}</div>
+    </div>
+  `).join('');
 }
 
-async function assocMateria() {
-  const matricula = document.getElementById('assoc-aluno-sel').value;
-  const materia   = document.getElementById('assoc-mat-sel').value;
-  if(!matricula||!materia) return toast('Selecione aluno e matéria.','erro');
-  const r = await api(`/api/alunos/${matricula}/materias`,'POST',{materia});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Matéria associada!');
-  await carregarDados();
-  carregarMatAluno();
+async function salvarConteudo(){
+  const materia=document.getElementById('cl-mat').value;
+  const data=document.getElementById('cl-data').value;
+  const texto=document.getElementById('cl-texto').value.trim();
+  const msg=document.getElementById('cl-msg');
+  if(!materia||!data||!texto){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione a matéria, a data e descreva o conteúdo.';
+    return;
+  }
+  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{data,conteudo:texto});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Conteúdo salvo com sucesso!';
+    document.getElementById('cl-texto').value='';
+    await refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
 }
 
-async function desassocMateria(matricula, materia) {
-  const r = await api(`/api/alunos/${matricula}/materias/${encodeURIComponent(materia)}`,'DELETE');
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Matéria removida.');
-  await carregarDados();
-  carregarMatAluno();
+async function delConteudo(materia,data){
+  if(!confirm('Excluir este registro de conteúdo lecionado?'))return;
+  await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo/'+encodeURIComponent(data),'DELETE');
+  await refresh();
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// ASSOCIAR — TAB MATÉRIA PARA TURMA
-// ─────────────────────────────────────────────────────────────────────────
-async function assocMateriaTurma() {
-  const turmaId = document.getElementById('assoc-matturma-turma').value;
-  const materia = document.getElementById('assoc-matturma-mat').value;
-  if(!turmaId||!materia) return toast('Selecione turma e matéria.','erro');
-  const turma = D.turmas[turmaId];
-  if(!turma.alunos||!turma.alunos.length) return toast('Esta turma não tem alunos.','erro');
-  const r = await api(`/api/turmas/${turmaId}/materias`,'POST',{materia});
-  if(r.erro) return toast(r.erro,'erro');
-  toast(`Matéria associada a todos os ${turma.alunos.length} aluno(s) da turma!`);
-  carregarDados();
+async function assoc(){
+  const mat=document.getElementById('as-aluno').value;
+  const materia=document.getElementById('as-mat').value;
+  if(!mat||!materia){
+    document.getElementById('as-msg').style.color='#ef4444';
+    document.getElementById('as-msg').textContent='Selecione aluno e matéria.';
+    return;
+  }
+  const r=await api('/api/alunos/'+encodeURIComponent(mat)+'/materias','POST',{materia});
+  const msg=document.getElementById('as-msg');
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Associação realizada!';
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// CHAMADA
-// ─────────────────────────────────────────────────────────────────────────
-function carregarChamada() {
-  const mat  = document.getElementById('ch-mat').value;
-  const data = document.getElementById('ch-data').value;
-  if(!mat||!data) return toast('Selecione matéria e data.','erro');
-
-  const m = D.materias[mat];
-  if(!m) return toast('Matéria não encontrada.','erro');
-
-  const alunos = Object.entries(D.alunos)
-    .filter(([mk,a])=>(a.materias||[]).includes(mat));
-
-  if(!alunos.length) return toast('Nenhum aluno associado a esta matéria.','erro');
-
-  const chamadas = m.chamadas||{};
-  const tbody = document.querySelector('#tbl-chamada tbody');
-  tbody.innerHTML='';
-  alunos.forEach(([mk,a])=>{
-    const presente = chamadas[mk]&&chamadas[mk][data]===true;
-    tbody.innerHTML+=`<tr>
-      <td><code>${mk}</code></td>
-      <td>${a.nome}</td>
-      <td>
-        <div class="form-check form-switch">
-          <input class="form-check-input ch-check" type="checkbox" id="ch-${mk}"
-            data-mat="${mk}" ${presente?'checked':''}>
-          <label class="form-check-label" for="ch-${mk}">${presente?'Presente':'Faltou'}</label>
-        </div>
-      </td>
-    </tr>`;
-  });
-
-  // Label dinâmico
-  tbody.querySelectorAll('.ch-check').forEach(cb=>{
-    cb.addEventListener('change',function(){
-      this.nextElementSibling.textContent = this.checked?'Presente':'Faltou';
-    });
-  });
-
-  document.getElementById('card-chamada').style.display='block';
+async function desassoc(mat,materia){
+  await api('/api/alunos/'+encodeURIComponent(mat)+'/materias/'+encodeURIComponent(materia),'DELETE');
+  refresh();
 }
 
-function marcarTodos(v) {
-  document.querySelectorAll('.ch-check').forEach(cb=>{
-    cb.checked=v;
-    cb.nextElementSibling.textContent=v?'Presente':'Faltou';
-  });
+function loadChamada(){
+  const mat=document.getElementById('ch-mat').value;
+  const div=document.getElementById('ch-lista');
+  if(!mat){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para ver os alunos.</div>';
+    return;
+  }
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  if(!alunos.length){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
+    return;
+  }
+  let html='';
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<div class="group-header">${label}</div>`; },
+    (m,a)=>{
+      html+=`
+    <div class="check-row">
+      <input type="checkbox" id="ch-${m}" checked>
+      <label for="ch-${m}">${a.nome}</label>
+    </div>`;
+    }
+  );
+  div.innerHTML=html;
 }
 
-async function salvarChamada() {
-  const mat  = document.getElementById('ch-mat').value;
-  const data = document.getElementById('ch-data').value;
+async function salvarChamada(){
+  const mat=document.getElementById('ch-mat').value;
+  const data=document.getElementById('ch-data').value;
+  const msg=document.getElementById('ch-msg');
+  if(!mat||!data){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione matéria e data.';
+    return;
+  }
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   const presencas={};
-  document.querySelectorAll('.ch-check').forEach(cb=>{
-    presencas[cb.dataset.mat]=cb.checked;
+  alunos.forEach(([m])=>{
+    presencas[m]=document.getElementById('ch-'+m)?.checked||false;
   });
-  const r = await api('/api/chamada','POST',{materia:mat,data,presencas});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Chamada salva!');
-  carregarDados();
+  const r=await api('/api/chamada','POST',{materia:mat,data,presencas});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Chamada salva!';
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// NOTAS
-// ─────────────────────────────────────────────────────────────────────────
-function carregarNotas() {
-  const mat = document.getElementById('nt-mat').value;
-  if(!mat) return toast('Selecione uma matéria.','erro');
-  const m = D.materias[mat];
-  if(!m) return toast('Matéria não encontrada.','erro');
+function loadNotas(){
+  const mat=document.getElementById('nt-mat').value;
+  const div=document.getElementById('nt-lista');
+  const msg=document.getElementById('nt-msg');
+  msg.textContent='';
+  
+  if(!mat){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para lançar notas.</div>';
+    return;
+  }
+  
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  if(!alunos.length){
+    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
+    return;
+  }
 
-  const alunos = Object.entries(D.alunos)
-    .filter(([mk,a])=>(a.materias||[]).includes(mat));
-
-  if(!alunos.length) return toast('Nenhum aluno associado a esta matéria.','erro');
-
-  const notas = m.notas||{};
-  const avs   = ['AV1','AV2','AV3'];
-  const tbody = document.querySelector('#tbl-notas tbody');
-  tbody.innerHTML='';
-  alunos.forEach(([mk,a])=>{
-    const an = notas[mk]||{};
-    const campos = avs.map(av=>`
-      <td><input type="number" class="form-control form-control-sm nota-inp" min="0" max="10" step="0.1"
-        data-aluno="${mk}" data-av="${av}" value="${an[av]!==undefined?an[av]:''}" style="width:70px">
-      </td>`).join('');
-    const media = avs.map(av=>an[av]).filter(v=>v!==undefined&&v!=='').reduce((a,b,_,arr)=>a+b/arr.length,0);
-    const mediaStr = avs.some(av=>an[av]!==undefined&&an[av]!=='')?media.toFixed(1):'—';
-    const cor = media>=7?'text-success':media>=5?'text-warning':'text-danger';
-    tbody.innerHTML+=`<tr><td>${a.nome}</td>${campos}<td class="fw-bold ${cor}">${mediaStr}</td></tr>`;
+  // Coleta avaliações existentes
+  const avalsSet=new Set();
+  alunos.forEach(([m])=>{
+    const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+    Object.keys(notasAluno).forEach(av=>avalsSet.add(av));
   });
+  
+  currentEvaluations=[...avalsSet].sort();
+  if(currentEvaluations.length===0){
+    currentEvaluations=['P1','P2'];
+  }
 
-  // Recalcula média ao digitar
-  document.querySelectorAll('.nota-inp').forEach(inp=>{
-    inp.addEventListener('input',()=>{
-      const row = inp.closest('tr');
-      const vals = [...row.querySelectorAll('.nota-inp')]
-        .map(i=>i.value).filter(v=>v!=='').map(Number);
-      const mediaCell = row.querySelector('td:last-child');
-      if(vals.length){
-        const m2 = vals.reduce((a,b)=>a+b,0)/vals.length;
-        mediaCell.textContent=m2.toFixed(1);
-        mediaCell.className='fw-bold '+(m2>=7?'text-success':m2>=5?'text-warning':'text-danger');
-      } else { mediaCell.textContent='—'; mediaCell.className='fw-bold'; }
-    });
-  });
-
-  document.getElementById('card-notas').style.display='block';
+  renderNotasTable(alunos,mat);
 }
 
-async function salvarNotas() {
-  const mat   = document.getElementById('nt-mat').value;
-  const notas = {};
-  document.querySelectorAll('.nota-inp').forEach(inp=>{
-    if(inp.value==='') return;
-    const al = inp.dataset.aluno;
-    const av = inp.dataset.av;
-    if(!notas[al]) notas[al]={};
-    notas[al][av]=parseFloat(inp.value);
+function renderNotasTable(alunos,mat){
+  const div=document.getElementById('nt-lista');
+  
+  let html='<div class="table-container"><table class="stripe">';
+  html+='<thead><tr><th>Aluno</th>';
+  currentEvaluations.forEach(av=>{
+    html+=`<th class="text-center">${av}</th>`;
   });
-  const r = await api('/api/notas','POST',{materia:mat,notas});
-  if(r.erro) return toast(r.erro,'erro');
-  toast('Notas salvas!');
-  carregarDados();
+  html+='<th class="text-center">Média</th></tr></thead><tbody>';
+  const colspanGrupo=currentEvaluations.length+2;
+
+  agruparPorTurma(alunos,
+    (label)=>{ html+=`<tr class="group-row"><td colspan="${colspanGrupo}">${label}</td></tr>`; },
+    (m,a)=>{
+      const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+
+      html+=`<tr><td class="font-medium" style="color: #334155;">${a.nome}</td>`;
+
+      currentEvaluations.forEach(av=>{
+        const val=notasAluno[av]!==undefined?notasAluno[av]:'';
+        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
+      });
+
+      const media=calcMedia(notasAluno);
+      const badgeClass=media===null?'none':(media>=6?'aprovado':'reprovado');
+      const mediaText=media!==null?media.toFixed(2):'—';
+
+      html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td></tr>`;
+    }
+  );
+  
+  html+='</tbody></table></div>';
+  html+=`<div class="table-footer"><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
+  
+  div.innerHTML=html;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// SELECTS POPULADOS DINAMICAMENTE
-// ─────────────────────────────────────────────────────────────────────────
-function popularSelects() {
-  // Curso -> sels
-  const selsCurso = ['mat-curso','turma-curso','assoc-matturma-turma'];
-  // Preenche selects de CURSOS
-  ['mat-curso','turma-curso'].forEach(id=>{
-    const el = document.getElementById(id);
-    const val = el.value;
-    el.innerHTML='<option value="">— Selecione um curso —</option>';
-    Object.entries(D.cursos).forEach(([cid,c])=>{
-      el.innerHTML+=`<option value="${cid}">${c.nome}</option>`;
+function addAvaliacao(){
+  const mat=document.getElementById('nt-mat').value;
+  const avalInput=document.getElementById('nt-aval');
+  const aval=avalInput.value.trim();
+  const msg=document.getElementById('nt-msg');
+  
+  if(!mat){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione uma matéria primeiro.';
+    return;
+  }
+  if(!aval){
+    msg.style.color='#ef4444';
+    msg.textContent='Digite o nome da avaliação.';
+    return;
+  }
+  if(currentEvaluations.includes(aval)){
+    msg.style.color='#ef4444';
+    msg.textContent='Esta avaliação já existe.';
+    return;
+  }
+  
+  currentEvaluations.push(aval);
+  avalInput.value='';
+  msg.textContent='';
+  
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  
+  // Salva temporariamente na memória os valores digitados para não perdê-los no re-render
+  alunos.forEach(([m])=>{
+    if(!dados.materias[mat].notas) dados.materias[mat].notas={};
+    if(!dados.materias[mat].notas[m]) dados.materias[mat].notas[m]={};
+    
+    currentEvaluations.forEach(av=>{
+      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
+      if(input){
+        const val=input.value.trim();
+        if(val===''){
+          delete dados.materias[mat].notas[m][av];
+        }else{
+          dados.materias[mat].notas[m][av]=parseFloat(val.replace(',','.'));
+        }
+      }
     });
-    el.value=val;
   });
-
-  // Selects de TURMA
-  ['assoc-turma-sel','assoc-matturma-turma'].forEach(id=>{
-    const el = document.getElementById(id);
-    const val = el.value;
-    el.innerHTML='<option value="">— Selecione uma turma —</option>';
-    Object.entries(D.turmas).forEach(([tid,t])=>{
-      el.innerHTML+=`<option value="${tid}">${t.nome}${t.ano?' ('+t.ano+')':''}</option>`;
-    });
-    el.value=val;
-  });
-
-  // Selects de ALUNO
-  ['assoc-aluno-sel'].forEach(id=>{
-    const el = document.getElementById(id);
-    const val = el.value;
-    el.innerHTML='<option value="">— Selecione —</option>';
-    Object.entries(D.alunos).forEach(([mat,a])=>{
-      el.innerHTML+=`<option value="${mat}">${a.nome}</option>`;
-    });
-    el.value=val;
-  });
-
-  // Selects de MATÉRIA
-  ['assoc-mat-sel','ch-mat','nt-mat','assoc-matturma-mat'].forEach(id=>{
-    const el = document.getElementById(id);
-    const val = el.value;
-    el.innerHTML='<option value="">— Selecione —</option>';
-    Object.keys(D.materias).forEach(m=>{
-      el.innerHTML+=`<option value="${m}">${m}</option>`;
-    });
-    el.value=val;
-  });
+  
+  renderNotasTable(alunos,mat);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// NAVEGAÇÃO
-// ─────────────────────────────────────────────────────────────────────────
-const TITLES = {
-  dashboard:'Dashboard', cursos:'Cursos', materias:'Matérias',
-  professores:'Professores', alunos:'Alunos', turmas:'Turmas',
-  associar:'Associar', chamada:'Chamada', notas:'Notas'
-};
-
-document.querySelectorAll('#sidebar .nav-link').forEach(link=>{
-  link.addEventListener('click',e=>{
-    e.preventDefault();
-    const page = link.dataset.page;
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('#sidebar .nav-link').forEach(l=>l.classList.remove('active'));
-    document.getElementById('page-'+page).classList.add('active');
-    link.classList.add('active');
-    document.getElementById('topbar-title').textContent = TITLES[page]||page;
+function recalcStudentAverage(matricula){
+  const inputs=document.querySelectorAll(`input[data-student="${matricula}"]`);
+  let sum=0;
+  let count=0;
+  inputs.forEach(input=>{
+    const val=parseFloat(input.value.replace(',','.'));
+    if(!isNaN(val)){
+      sum+=val;
+      count++;
+    }
   });
-});
+  
+  const mediaBadge=document.getElementById(`media-${matricula}`);
+  if(count>0){
+    const media=sum/count;
+    mediaBadge.textContent=media.toFixed(2);
+    mediaBadge.className='media-badge '+(media>=6?'aprovado':'reprovado');
+  }else{
+    mediaBadge.textContent='—';
+    mediaBadge.className='media-badge none';
+  }
+}
 
-// Tabs da página Associar
-document.querySelectorAll('[data-tab]').forEach(tab=>{
-  tab.addEventListener('click',e=>{
-    e.preventDefault();
-    document.querySelectorAll('.tab-content-item').forEach(t=>t.style.display='none');
-    document.querySelectorAll('[data-tab]').forEach(t=>t.classList.remove('active'));
-    document.getElementById(tab.dataset.tab).style.display='block';
-    tab.classList.add('active');
+async function salvarNotas(){
+  const mat=document.getElementById('nt-mat').value;
+  const msg=document.getElementById('nt-msg');
+  
+  if(!mat){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione a matéria.';
+    return;
+  }
+  
+  const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
+  const notas={};
+  
+  alunos.forEach(([m])=>{
+    notas[m]={};
+    currentEvaluations.forEach(av=>{
+      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
+      if(input){
+        const val=input.value.trim();
+        if(val!==''){
+          const numVal=parseFloat(val.replace(',','.'));
+          if(!isNaN(numVal)&&numVal>=0&&numVal<=10){
+            notas[m][av]=numVal;
+          }
+        }
+      }
+    });
   });
-});
+  
+  const r=await api('/api/notas','POST',{materia:mat,notas});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Notas salvas com sucesso!';
+    await refresh();
+    loadNotas();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro||'Erro ao salvar notas.';
+  }
+}
 
-// ─────────────────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────────────────
-carregarDados();
+function loadBoletim(){
+  const mat=document.getElementById('bl-aluno').value;
+  const div=document.getElementById('bl-conteudo');
+  if(!mat){div.innerHTML='';return;}
+  const aluno=dados.alunos[mat];
+  if(!aluno){div.innerHTML='';return;}
+  const turmaHtml=`<div style="margin-bottom:1rem"><span class="badge">Turma: ${turmaLabel(aluno.turma)}</span></div>`;
+  const materias=aluno.materias||[];
+  if(!materias.length){
+    div.innerHTML=turmaHtml+'<div class="card" style="color:#64748b; font-size:13px; text-align:center">Aluno sem matérias associadas.</div>';
+    return;
+  }
+  let html=turmaHtml;
+  materias.forEach(nome=>{
+    const matDados=dados.materias[nome];
+    const notasAluno=matDados?.notas?.[mat]||{};
+    const avals=Object.keys(notasAluno).sort();
+    const media=calcMedia(notasAluno);
+    const ap=media!==null&&media>=6;
+    const badgeClass=media===null?'none':(ap?'aprovado':'reprovado');
+    const badgeText=media!==null?(ap?'Aprovado':'Reprovado')+' — Média: '+media.toFixed(2):'Sem notas';
+    
+    html+=`<div class="card boletim-card">`;
+    html+=`<div class="boletim-card-header">`;
+    html+=`<strong>${nome}</strong>`;
+    html+=`<span class="media-badge ${badgeClass}">${badgeText}</span>`;
+    html+='</div>';
+    if(avals.length){
+      html+='<div class="table-container"><table class="stripe"><thead><tr>';
+      avals.forEach(av=>{html+=`<th class="text-center">${av}</th>`;});
+      html+='</tr></thead><tbody><tr>';
+      avals.forEach(av=>{html+=`<td class="text-center font-medium">${notasAluno[av]}</td>`;});
+      html+='</tr></tbody></table></div>';
+    }else{
+      html+='<div class="no-grades">Nenhuma nota lançada.</div>';
+    }
+    html+='</div>';
+  });
+  div.innerHTML=html;
+}
+
+document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
+document.getElementById('cl-data').value=new Date().toISOString().split('T')[0];
+document.getElementById('modal-editar').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+document.getElementById('modal-senha').addEventListener('click',function(e){if(e.target===this)fecharModalSenha();});
+
+function baixarDiario(){
+  const turma=document.getElementById('dr-turma').value;
+  const materia=document.getElementById('dr-materia').value;
+  const instituicao=document.getElementById('dr-instituicao').value.trim();
+  const curso=document.getElementById('dr-curso').value.trim();
+  const msg=document.getElementById('dr-msg');
+  if(!turma||!materia){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione turma e matéria.';
+    return;
+  }
+  msg.style.color='#10b981';
+  msg.textContent='Gerando arquivo...';
+  const params=new URLSearchParams({turma,materia,instituicao,curso});
+  window.location.href='/api/diario?'+params.toString();
+  setTimeout(()=>{ msg.textContent=''; },2000);
+}
+
+function renderLogoPreview(){
+  const div=document.getElementById('lg-preview');
+  const btnRemover=document.getElementById('lg-remover');
+  if(!div) return;
+  const cfg=dados.config||{};
+  if(cfg.logo_b64){
+    div.innerHTML=`<img src="data:${cfg.logo_mime};base64,${cfg.logo_b64}" style="max-height:60px; border:1px solid #e2e8f0; border-radius:6px; padding:4px; display:block">`;
+    if(btnRemover) btnRemover.style.display='inline-flex';
+  }else{
+    div.innerHTML='<span style="font-size:13px; color:#94a3b8">Nenhum logotipo enviado ainda.</span>';
+    if(btnRemover) btnRemover.style.display='none';
+  }
+}
+
+async function enviarLogo(){
+  const input=document.getElementById('lg-arquivo');
+  const msg=document.getElementById('lg-msg');
+  const file=input.files[0];
+  if(!file){
+    msg.style.color='#ef4444';
+    msg.textContent='Escolha uma imagem PNG ou JPG.';
+    return;
+  }
+  if(file.size>2*1024*1024){
+    msg.style.color='#ef4444';
+    msg.textContent='Imagem muito grande (máx. 2MB).';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=async function(){
+    const r=await api('/api/logo','POST',{imagem:reader.result});
+    if(r.ok){
+      msg.style.color='#10b981';
+      msg.textContent='Logotipo salvo com sucesso!';
+      input.value='';
+      await refresh();
+    }else{
+      msg.style.color='#ef4444';
+      msg.textContent=r.erro;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function removerLogo(){
+  if(!confirm('Remover o logotipo do Diário?'))return;
+  await api('/api/logo','DELETE');
+  await refresh();
+}
+
+function baixarBackup(){
+  window.location.href='/api/backup';
+}
+
+async function restaurarBackup(){
+  const input=document.getElementById('bk-arquivo');
+  const msg=document.getElementById('bk-msg');
+  const file=input.files[0];
+  if(!file){
+    msg.style.color='#ef4444';
+    msg.textContent='Escolha um arquivo de backup (.json).';
+    return;
+  }
+  if(!confirm('Tem certeza? Isso vai substituir TODOS os dados atuais pelos do arquivo de backup. Essa ação não pode ser desfeita.')){
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=async function(){
+    let dadosBackup;
+    try{
+      dadosBackup=JSON.parse(reader.result);
+    }catch(e){
+      msg.style.color='#ef4444';
+      msg.textContent='Esse arquivo não é um JSON válido.';
+      return;
+    }
+    const r=await api('/api/backup/restaurar','POST',{dados:dadosBackup});
+    if(r.ok){
+      msg.style.color='#10b981';
+      msg.textContent='Backup restaurado com sucesso! Atualizando...';
+      input.value='';
+      await refresh();
+    }else{
+      msg.style.color='#ef4444';
+      msg.textContent=r.erro;
+    }
+  };
+  reader.readAsText(file);
+}
+
+refresh();
 </script>
 </body>
 </html>
