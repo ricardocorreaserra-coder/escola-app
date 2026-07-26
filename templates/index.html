@@ -1200,10 +1200,16 @@ function renderAssoc(){
 
 function opcoesAlunosAgrupadas(alunos){
   let html='';
+  let grupoAberto=false;
   agruparPorTurma(alunos,
-    (label)=>{ html+=`<optgroup label="${label}">`; },
+    (label)=>{
+      if(grupoAberto) html+='</optgroup>';
+      html+=`<optgroup label="${label}">`;
+      grupoAberto=true;
+    },
     (mat,a)=>{ html+=`<option value="${mat}">${a.nome}</option>`; }
   );
+  if(grupoAberto) html+='</optgroup>';
   return html;
 }
 
