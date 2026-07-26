@@ -992,6 +992,7 @@ tr.group-row td {
 let dados={alunos:{},materias:{},turmas:{}};
 let editandoId=null;
 let currentEvaluations=[];
+let notasModificadas=false;
 
 async function api(url,method='GET',body=null){
   const opts={method,headers:{'Content-Type':'application/json'}};
@@ -1014,6 +1015,12 @@ async function refresh(){
 }
 
 function showTab(id,el){
+  if(notasModificadas && id!=='notas'){
+    if(!confirm('Há notas não salvas na aba "Notas". Se sair agora, as alterações serão perdidas.\n\nDeseja continuar mesmo assim?')){
+      return;
+    }
+    notasModificadas=false;
+  }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   el.classList.add('active');
@@ -1752,6 +1759,7 @@ async function salvarChamada(){
 
 function loadNotas(){
   const mat=document.getElementById('nt-mat').value;
+  notasModificadas=false;
   const div=document.getElementById('nt-lista');
   const msg=document.getElementById('nt-msg');
   msg.textContent='';
@@ -1802,7 +1810,7 @@ function renderNotasTable(alunos,mat){
 
       currentEvaluations.forEach(av=>{
         const val=notasAluno[av]!==undefined?notasAluno[av]:'';
-        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
+        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="notasModificadas=true;recalcStudentAverage('${m}')"></td>`;
       });
 
       const media=calcMedia(notasAluno);
@@ -1894,6 +1902,7 @@ function recalcStudentAverage(matricula){
 async function salvarNotas(){
   const mat=document.getElementById('nt-mat').value;
   const msg=document.getElementById('nt-msg');
+  notasModificadas=false;
   
   if(!mat){
     msg.style.color='#ef4444';
@@ -1975,6 +1984,12 @@ function loadBoletim(){
 
 document.getElementById('ch-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('cl-data').value=new Date().toISOString().split('T')[0];
+window.addEventListener('beforeunload',function(e){
+  if(notasModificadas){
+    e.preventDefault();
+    e.returnValue='';
+  }
+});
 document.getElementById('modal-editar').addEventListener('click',function(e){if(e.target===this)fecharModal();});
 document.getElementById('modal-senha').addEventListener('click',function(e){if(e.target===this)fecharModalSenha();});
 document.getElementById('modal-prof-materias').addEventListener('click',function(e){if(e.target===this)fecharModalProfMaterias();});
