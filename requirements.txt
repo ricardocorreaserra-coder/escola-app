@@ -3,4 +3,4 @@ gunicorn
 psycopg2-binary
 openpyxl
 Pillow
-
+reportlab
