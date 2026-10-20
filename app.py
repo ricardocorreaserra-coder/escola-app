@@ -8,6 +8,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.drawing.image import Image as XLImage
 from PIL import Image as PILImage
+from diario_pdf import gerar_diario_pdf
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
@@ -948,6 +949,48 @@ def gerar_diario():
     nome_arquivo = f"Diario_{turma}_{materia}.xlsx".replace(" ", "_")
     return send_file(buf, as_attachment=True, download_name=nome_arquivo,
                       mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+@app.route("/api/diario/pdf", methods=["GET"])
+@login_required
+def gerar_diario_pdf_rota():
+    d = load()
+    turma = sanitize(request.args.get("turma", ""))
+    materia = sanitize(request.args.get("materia", ""))
+    instituicao = sanitize(request.args.get("instituicao", ""))
+    curso = sanitize(request.args.get("curso", ""))
+
+    if materia not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    if not turma or turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+
+    alunos = [(mat, a) for mat, a in d["alunos"].items()
+              if materia in a.get("materias", []) and a.get("turma", "") == turma]
+    alunos.sort(key=lambda x: x[1]["nome"])
+
+    mat_dados = d["materias"][materia]
+    if not curso:
+        curso = mat_dados.get("curso", "")
+    chamadas = mat_dados.get("chamadas", {})
+    notas = mat_dados.get("notas", {})
+    conteudos = mat_dados.get("conteudos", {})
+    datas_chamada = {data for reg in chamadas.values() for data in reg.keys()}
+    datas = sorted(datas_chamada | set(conteudos.keys()))
+    avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
+    ano = datetime.datetime.now().year
+
+    logo_bytes = None
+    logo_b64 = d.get("config", {}).get("logo_b64")
+    if logo_b64:
+        try:
+            logo_bytes = base64.b64decode(logo_b64)
+        except Exception:
+            logo_bytes = None
+
+    buf = gerar_diario_pdf(instituicao, curso, materia, mat_dados.get("professor", ""), turma, ano,
+                           alunos, datas, chamadas, avals, notas, conteudos, logo_bytes)
+    nome_arquivo = f"Diario_{turma}_{materia}.pdf".replace(" ", "_")
+    return send_file(buf, as_attachment=True, download_name=nome_arquivo, mimetype="application/pdf")
 
 @app.route("/api/backup", methods=["GET"])
 @login_required
