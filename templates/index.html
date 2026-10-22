@@ -1497,7 +1497,7 @@ function renderNotasTable(alunos,mat){
   );
   
   html+='</tbody></table></div>';
-  html+=`<div class="table-footer"><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
+  html+=`<div class="table-footer" style="align-items:center; gap:14px"><span class="msg" id="nt-msg-rodape" style="margin:0"></span><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
   
   div.innerHTML=html;
 }
@@ -1605,13 +1605,30 @@ async function salvarNotas(){
   
   const r=await api('/api/notas','POST',{materia:mat,notas});
   if(r.ok){
-    msg.style.color='#10b981';
-    msg.textContent='Notas salvas com sucesso!';
     await refresh();
     loadNotas();
+    mostrarMsgNotas('✓ Notas salvas com sucesso!','#10b981',4000);
   }else{
-    msg.style.color='#ef4444';
-    msg.textContent=r.erro||'Erro ao salvar notas.';
+    mostrarMsgNotas(r.erro||'Erro ao salvar notas.','#ef4444',0);
+  }
+}
+
+// Mostra a mensagem no topo e ao lado do botão "Salvar Notas" (que fica no fim da tabela).
+// Precisa ser chamada depois de loadNotas(), que limpa a mensagem e recria o rodapé.
+let _msgNotasTimer=null;
+function mostrarMsgNotas(texto,cor,ms){
+  clearTimeout(_msgNotasTimer);
+  ['nt-msg','nt-msg-rodape'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.style.color=cor; el.textContent=texto; }
+  });
+  if(ms>0){
+    _msgNotasTimer=setTimeout(()=>{
+      ['nt-msg','nt-msg-rodape'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(el) el.textContent='';
+      });
+    },ms);
   }
 }
 
