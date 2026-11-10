@@ -18,6 +18,9 @@ from reportlab.platypus import (
 )
 from xml.sax.saxutils import escape as _xml_escape
 
+# Cada dia de aula vale 4 horas-aula: vale para "Aulas dadas" e para as faltas.
+AULAS_POR_DIA = 4
+
 # --- Medidas (pt) -----------------------------------------------------------
 MARGEM = 28
 LARGURA_UTIL = landscape(A4)[0] - 2 * MARGEM   # ~786
@@ -165,7 +168,7 @@ def _tabela_frente(alunos, bloco, ultimo, avals, chamadas, notas, datas_total):
                     linha[col_a0 + i] = _fmt_num(v, 1)
                     vals.append(v)
             linha[col_media] = _fmt_num(sum(vals) / len(vals), 2) if vals else ""
-            linha[col_faltas] = str(sum(1 for d in datas_total if ch.get(d) is False))
+            linha[col_faltas] = str(AULAS_POR_DIA * sum(1 for d in datas_total if ch.get(d) is False))
         linhas.append(linha)
 
     larguras = [W_NUM, W_ALUNO] + [W_DATA] * n_d
@@ -234,7 +237,7 @@ def _verso(datas, conteudos, professor):
     resumo = Table(
         [[Paragraph("<b>RESUMO DO BIMESTRE</b>", st_res), "", "", ""],
          [Paragraph("<b>Aulas previstas:</b> ______", st_res),
-          Paragraph(f"<b>Aulas dadas:</b> {len(datas)}", st_res),
+          Paragraph(f"<b>Aulas dadas:</b> {len(datas) * AULAS_POR_DIA}", st_res),
           Paragraph("<b>Encerrado em:</b> ____/____/________", st_res),
           Paragraph(f"<b>Professor(a):</b> {_p(professor)}", st_res)]],
         colWidths=[LARGURA_UTIL * 0.20, LARGURA_UTIL * 0.20,
@@ -275,7 +278,7 @@ def gerar_diario_pdf(instituicao, curso, materia, professor, turma, ano,
                             logo_bytes, titulo)
         story.append(_tabela_frente(alunos, bloco, ultimo, avals, chamadas, notas, datas))
         story += [Spacer(1, 8),
-                  Paragraph("Legenda: P = presente &nbsp;&nbsp; F = falta", st_legenda),
+                  Paragraph(f"Legenda: P = presente &nbsp;&nbsp; F = falta &nbsp;&nbsp;|&nbsp;&nbsp; cada dia de aula = {AULAS_POR_DIA} horas-aula (as faltas são contadas em horas-aula)", st_legenda),
                   PageBreak()]
 
     story += _verso(datas, conteudos, professor)
