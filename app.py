@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file, g, has_request_context
 import os, html, psycopg2, sqlite3, json, uuid, time, datetime, base64, re, csv, io
 from io import BytesIO
 from functools import wraps
@@ -8,7 +8,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.drawing.image import Image as XLImage
 from PIL import Image as PILImage
-from diario_pdf import gerar_diario_pdf
+from diario_pdf import gerar_diario_pdf, AULAS_POR_DIA
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
@@ -81,6 +81,7 @@ def bootstrap_admin():
         d["usuarios"]["admin"] = {
             "usuario": "admin",
             "nome": "Administrador",
+            "papel": "admin",
             "senha_hash": generate_password_hash(admin_pass)
         }
         save(d)
@@ -119,7 +120,7 @@ def init_db():
         conn.close()
     bootstrap_admin()
 
-def load():
+def _load_db():
     conn = get_conn()
     c = conn.cursor()
     try:
@@ -142,12 +143,14 @@ def load():
             d["professores"] = {}
         if "cursos" not in d:
             d["cursos"] = {}
+        if "atribuicoes" not in d:
+            d["atribuicoes"] = []
         return d
     finally:
         c.close()
         conn.close()
 
-def save(dados):
+def _save_db(dados):
     placeholder = "%s" if DATABASE_URL else "?"
     conn = get_conn()
     c = conn.cursor()
@@ -158,19 +161,69 @@ def save(dados):
         c.close()
         conn.close()
 
+def load():
+    # Dentro de uma requisição, carrega o banco uma única vez (o decorador de permissão
+    # e a rota compartilham o mesmo objeto).
+    if has_request_context():
+        if not hasattr(g, "_dados"):
+            g._dados = _load_db()
+        return g._dados
+    return _load_db()
+
+def save(dados):
+    _save_db(dados)
+    if has_request_context():
+        g._dados = dados
+
 def sanitize(text):
-    return html.escape(str(text).strip())[:100]
+    # unescape antes de escapar: é idempotente (nomes com & ou ' não são escapados duas vezes
+    # quando o frontend devolve o valor que recebeu do servidor)
+    return html.escape(html.unescape(str(text).strip()))[:100]
 
 def sanitize_long(text, max_len=2000):
-    return html.escape(str(text).strip())[:max_len]
+    return html.escape(html.unescape(str(text).strip()))[:max_len]
 
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("logado"):
-            return jsonify({"erro": "Não autorizado."}), 401
-        return f(*args, **kwargs)
-    return decorated
+PAPEIS = ("admin", "secretaria", "professor")
+USUARIO_RE = re.compile(r"^[A-Za-z0-9._-]{3,30}$")
+
+def papel_do_usuario(ud):
+    # contas antigas (só existia o admin) não têm "papel": são administradores
+    return (ud or {}).get("papel") or "admin"
+
+def _usuario_atual(d):
+    u = session.get("usuario")
+    return d.get("usuarios", {}).get(u) if u else None
+
+def papel_required(*papeis):
+    """Exige login e que o papel do usuário (lido do banco a cada requisição) esteja em `papeis`."""
+    def deco(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not session.get("logado"):
+                return jsonify({"erro": "Não autorizado."}), 401
+            ud = _usuario_atual(load())
+            if ud is None:  # usuário foi excluído: derruba a sessão
+                session.clear()
+                return jsonify({"erro": "Não autorizado."}), 401
+            if papeis and papel_do_usuario(ud) not in papeis:
+                return jsonify({"erro": "Você não tem permissão para esta ação."}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return deco
+
+login_required = papel_required()  # qualquer usuário logado
+
+def turmas_permitidas(d, ud, materia):
+    """Turmas em que o professor logado leciona a matéria."""
+    prof = (ud or {}).get("professor", "")
+    return {a["turma"] for a in d.get("atribuicoes", [])
+            if a.get("professor") == prof and a.get("materia") == materia}
+
+def professor_da_turma(d, turma, materia):
+    for a in d.get("atribuicoes", []):
+        if a.get("turma") == turma and a.get("materia") == materia:
+            return a.get("professor", "")
+    return d["materias"].get(materia, {}).get("professor", "")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -218,11 +271,49 @@ def index():
 @login_required
 def get_dados():
     d = load()
-    d.pop("usuarios", None)  # nunca expor hashes de senha ao frontend
-    return jsonify(d)
+    ud = _usuario_atual(d)
+    papel = papel_do_usuario(ud)
+    eu = {"usuario": session.get("usuario"), "nome": ud.get("nome", ""), "papel": papel,
+          "professor": ud.get("professor", "")}
+    if papel == "professor":
+        return jsonify(_dados_do_professor(d, ud, eu))
+    out = {k: v for k, v in d.items() if k != "usuarios"}  # nunca expor hashes de senha
+    out["eu"] = eu
+    out["aulas_por_dia"] = AULAS_POR_DIA
+    out["logins_professores"] = {u["professor"]: login for login, u in d["usuarios"].items()
+                                 if u.get("papel") == "professor" and u.get("professor")}
+    if papel != "admin":
+        out.pop("config", None)  # logotipo só interessa ao admin
+    return jsonify(out)
+
+def _dados_do_professor(d, ud, eu):
+    """Só as turmas/matérias/alunos que o professor leciona."""
+    prof = ud.get("professor", "")
+    atribs = [a for a in d.get("atribuicoes", []) if a.get("professor") == prof]
+    pares = {(a["turma"], a["materia"]) for a in atribs}
+    turmas = {t for t, _ in pares}
+    materias_perm = {m for _, m in pares}
+    alunos = {}
+    for mat, a in d["alunos"].items():
+        t = a.get("turma", "")
+        if t in turmas:
+            alunos[mat] = {**a, "materias": [m for m in a.get("materias", []) if (t, m) in pares]}
+    materias = {}
+    for nome in materias_perm:
+        m = d["materias"].get(nome)
+        if m is None:
+            continue
+        materias[nome] = {
+            **m,
+            "chamadas": {k: v for k, v in m.get("chamadas", {}).items() if k in alunos},
+            "notas": {k: v for k, v in m.get("notas", {}).items() if k in alunos},
+        }
+    return {"alunos": alunos, "turmas": {t: {} for t in turmas}, "materias": materias,
+            "cursos": {}, "professores": {prof: {}} if prof else {}, "atribuicoes": atribs,
+            "eu": eu, "logins_professores": {}, "aulas_por_dia": AULAS_POR_DIA}
 
 @app.route("/api/alunos", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def add_aluno():
     d = load()
     body = request.json
@@ -242,7 +333,7 @@ def add_aluno():
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/importar", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def importar_alunos():
     d = load()
     arquivo = request.files.get("arquivo")
@@ -313,7 +404,7 @@ def importar_alunos():
     return jsonify({"ok": True, "criados": criados, "duplicados": duplicados, "erros": erros[:20]})
 
 @app.route("/api/alunos/<matricula>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def del_aluno(matricula):
     d = load()
     matricula = sanitize(matricula)
@@ -327,7 +418,7 @@ def del_aluno(matricula):
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/<matricula>", methods=["PUT"])
-@login_required
+@papel_required("admin", "secretaria")
 def edit_aluno(matricula):
     d = load()
     matricula = sanitize(matricula)
@@ -349,7 +440,7 @@ def edit_aluno(matricula):
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/<matricula>/materias", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def assoc_materia(matricula):
     d = load()
     matricula = sanitize(matricula)
@@ -365,7 +456,7 @@ def assoc_materia(matricula):
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/<matricula>/materias/<materia>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def desassoc_materia(matricula, materia):
     d = load()
     aluno = d["alunos"].get(sanitize(matricula))
@@ -376,7 +467,7 @@ def desassoc_materia(matricula, materia):
     return jsonify({"ok": True})
 
 @app.route("/api/cursos", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def add_curso():
     d = load()
     nome = sanitize(request.json.get("nome", ""))
@@ -389,7 +480,7 @@ def add_curso():
     return jsonify({"ok": True})
 
 @app.route("/api/cursos/<nome>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def del_curso(nome):
     d = load()
     nome = sanitize(nome)
@@ -403,7 +494,7 @@ def del_curso(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/professores", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def add_professor():
     d = load()
     nome = sanitize(request.json.get("nome", ""))
@@ -416,13 +507,16 @@ def add_professor():
     return jsonify({"ok": True})
 
 @app.route("/api/professores/<nome>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def del_professor(nome):
     d = load()
     nome = sanitize(nome)
     if nome not in d["professores"]:
         return jsonify({"erro": "Professor não encontrado."}), 404
     del d["professores"][nome]
+    d["atribuicoes"] = [a for a in d.get("atribuicoes", []) if a.get("professor") != nome]
+    d["usuarios"] = {u: ud for u, ud in d["usuarios"].items()
+                     if not (ud.get("papel") == "professor" and ud.get("professor") == nome)}
     for mat in d["materias"].values():
         if mat.get("professor") == nome:
             mat["professor"] = ""
@@ -430,7 +524,7 @@ def del_professor(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/professores/<nome>/materias", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def atribuir_materias_professor(nome):
     d = load()
     nome = sanitize(nome)
@@ -446,7 +540,7 @@ def atribuir_materias_professor(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/materias/<nome>/curso", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def definir_curso_materia(nome):
     d = load()
     nome = sanitize(nome)
@@ -460,7 +554,7 @@ def definir_curso_materia(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/materias/<nome>/professor", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def definir_professor_materia(nome):
     d = load()
     nome = sanitize(nome)
@@ -474,7 +568,7 @@ def definir_professor_materia(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/turmas/<turma>/associar-materia", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def associar_turma_materia(turma):
     d = load()
     turma = sanitize(turma)
@@ -492,7 +586,7 @@ def associar_turma_materia(turma):
     return jsonify({"ok": True, "afetados": afetados})
 
 @app.route("/api/turmas/<turma>/desassociar-materia", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def desassociar_turma_materia(turma):
     d = load()
     turma = sanitize(turma)
@@ -508,7 +602,7 @@ def desassociar_turma_materia(turma):
     return jsonify({"ok": True, "afetados": afetados})
 
 @app.route("/api/materias", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def add_materia():
     d = load()
     nome = sanitize(request.json.get("nome", ""))
@@ -527,44 +621,243 @@ def add_materia():
     return jsonify({"ok": True})
 
 @app.route("/api/materias/<nome>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def del_materia(nome):
     d = load()
     nome = sanitize(nome)
     if nome not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
     del d["materias"][nome]
+    d["atribuicoes"] = [a for a in d.get("atribuicoes", []) if a.get("materia") != nome]
     for aluno in d["alunos"].values():
         if nome in aluno.get("materias", []):
             aluno["materias"].remove(nome)
     save(d)
     return jsonify({"ok": True})
 
+def _checar_professor_materia(d, nome):
+    """Professor só mexe em matérias que leciona. Retorna uma resposta de erro ou None."""
+    ud = _usuario_atual(d)
+    if papel_do_usuario(ud) == "professor" and not turmas_permitidas(d, ud, nome):
+        return jsonify({"erro": "Você não leciona esta matéria."}), 403
+    return None
+
+MAX_DATAS_CONTEUDO = 62
+
 @app.route("/api/materias/<nome>/conteudo", methods=["POST"])
-@login_required
+@papel_required("admin", "professor")
 def add_conteudo(nome):
     d = load()
     nome = sanitize(nome)
     if nome not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
-    data = sanitize(request.json.get("data", ""))
-    conteudo = sanitize_long(request.json.get("conteudo", ""))
-    if not data:
+    negado = _checar_professor_materia(d, nome)
+    if negado:
+        return negado
+    body = request.json or {}
+    # aceita "datas" (lista) ou "data" (uma só, formato antigo)
+    entrada = body.get("datas")
+    if entrada is None:
+        entrada = [body.get("data", "")]
+    if not isinstance(entrada, list) or not entrada:
         return jsonify({"erro": "Informe a data da aula."}), 400
+    datas = []
+    for x in entrada:
+        x = sanitize(x)
+        if not x:
+            continue
+        try:
+            datetime.datetime.strptime(x, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"erro": f"Data inválida: {html.unescape(x)}."}), 400
+        if x not in datas:
+            datas.append(x)
+    datas.sort()
+    if not datas:
+        return jsonify({"erro": "Informe a data da aula."}), 400
+    if len(datas) > MAX_DATAS_CONTEUDO:
+        return jsonify({"erro": f"Selecione no máximo {MAX_DATAS_CONTEUDO} datas por vez."}), 400
+    conteudo = sanitize_long(body.get("conteudo", ""))
     if not conteudo:
         return jsonify({"erro": "Descreva o conteúdo lecionado."}), 400
-    d["materias"][nome].setdefault("conteudos", {})[data] = conteudo
+
+    mat = d["materias"][nome]
+    origem = None
+    if body.get("copiar_chamada") is True and len(datas) > 1:
+        # Copia a chamada da primeira data (a mais antiga) que já tiver chamada registrada.
+        # O professor só copia a chamada dos alunos das turmas que leciona nessa matéria.
+        ud = _usuario_atual(d)
+        permitidas = turmas_permitidas(d, ud, nome) if papel_do_usuario(ud) == "professor" else None
+
+        def aluno_ok(m):
+            a = d["alunos"].get(m)
+            if a is None:
+                return False
+            return permitidas is None or (a.get("turma", "") in permitidas and nome in a.get("materias", []))
+
+        chamadas = mat.setdefault("chamadas", {})
+        for dt in datas:
+            if any(dt in reg for m, reg in chamadas.items() if aluno_ok(m)):
+                origem = dt
+                break
+        if origem is None:
+            return jsonify({"erro": "Nenhuma das datas selecionadas tem chamada registrada. Registre a chamada de uma delas na aba Chamada."}), 400
+        for m, reg in chamadas.items():
+            if origem in reg and aluno_ok(m):
+                for dt in datas:
+                    reg[dt] = bool(reg[origem])
+
+    conteudos = mat.setdefault("conteudos", {})
+    for dt in datas:
+        conteudos[dt] = conteudo
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "datas": len(datas), "chamada_origem": origem})
 
 @app.route("/api/materias/<nome>/conteudo/<data>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "professor")
 def del_conteudo(nome, data):
     d = load()
     nome = sanitize(nome)
     data = sanitize(data)
     if nome in d["materias"]:
+        negado = _checar_professor_materia(d, nome)
+        if negado:
+            return negado
         d["materias"][nome].setdefault("conteudos", {}).pop(data, None)
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/atribuicoes", methods=["POST"])
+@papel_required("admin", "secretaria")
+def add_atribuicao():
+    d = load()
+    body = request.json or {}
+    prof = sanitize(body.get("professor", ""))
+    turma = sanitize(body.get("turma", ""))
+    materia = sanitize(body.get("materia", ""))
+    associar = body.get("associar_alunos", True) is not False
+    if prof not in d["professores"]:
+        return jsonify({"erro": "Professor não encontrado."}), 404
+    if turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    if materia not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    atribs = d.setdefault("atribuicoes", [])
+    for a in atribs:
+        if a["turma"] == turma and a["materia"] == materia:
+            if a["professor"] == prof:
+                return jsonify({"erro": "Essa atribuição já existe."}), 400
+            return jsonify({"erro": f"Esta turma já tem professor nesta matéria ({html.unescape(a['professor'])}). Remova a atribuição atual antes."}), 400
+    atribs.append({"professor": prof, "turma": turma, "materia": materia})
+    afetados = 0
+    if associar:
+        for aluno in d["alunos"].values():
+            if aluno.get("turma") == turma and materia not in aluno.get("materias", []):
+                aluno.setdefault("materias", []).append(materia)
+                afetados += 1
+    save(d)
+    return jsonify({"ok": True, "afetados": afetados})
+
+@app.route("/api/atribuicoes", methods=["DELETE"])
+@papel_required("admin", "secretaria")
+def del_atribuicao():
+    d = load()
+    body = request.json or {}
+    prof = sanitize(body.get("professor", ""))
+    turma = sanitize(body.get("turma", ""))
+    materia = sanitize(body.get("materia", ""))
+    atribs = d.get("atribuicoes", [])
+    restantes = [a for a in atribs if not (a["professor"] == prof and a["turma"] == turma and a["materia"] == materia)]
+    if len(restantes) == len(atribs):
+        return jsonify({"erro": "Atribuição não encontrada."}), 404
+    d["atribuicoes"] = restantes
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/usuarios", methods=["GET"])
+@papel_required("admin")
+def listar_usuarios():
+    d = load()
+    lista = [{"usuario": u, "nome": ud.get("nome", u), "papel": papel_do_usuario(ud),
+              "professor": ud.get("professor", "")} for u, ud in d["usuarios"].items()]
+    lista.sort(key=lambda x: (x["papel"], x["nome"].lower()))
+    return jsonify({"usuarios": lista})
+
+@app.route("/api/usuarios", methods=["POST"])
+@papel_required("admin", "secretaria")
+def criar_usuario():
+    d = load()
+    papel_atual = papel_do_usuario(_usuario_atual(d))
+    body = request.json or {}
+    usuario = str(body.get("usuario", "")).strip()
+    nome = sanitize(body.get("nome", ""))
+    senha = str(body.get("senha", ""))
+    papel = body.get("papel", "")
+    if papel not in PAPEIS:
+        return jsonify({"erro": "Perfil inválido."}), 400
+    if papel_atual == "secretaria" and papel != "professor":
+        return jsonify({"erro": "Secretárias só podem criar acessos de professores."}), 403
+    if not USUARIO_RE.match(usuario):
+        return jsonify({"erro": "Usuário deve ter de 3 a 30 caracteres: letras, números, ponto, hífen ou sublinhado."}), 400
+    if any(u.lower() == usuario.lower() for u in d["usuarios"]):
+        return jsonify({"erro": "Esse usuário já existe."}), 400
+    if len(senha) < 6:
+        return jsonify({"erro": "A senha deve ter pelo menos 6 caracteres."}), 400
+    prof_nome = ""
+    if papel == "professor":
+        prof_nome = sanitize(body.get("professor", ""))
+        if prof_nome not in d["professores"]:
+            return jsonify({"erro": "Professor não encontrado."}), 404
+        if any(u.get("papel") == "professor" and u.get("professor") == prof_nome for u in d["usuarios"].values()):
+            return jsonify({"erro": "Este professor já possui acesso."}), 400
+        nome = nome or prof_nome
+    if not nome:
+        return jsonify({"erro": "Nome é obrigatório."}), 400
+    novo = {"usuario": usuario, "nome": nome, "papel": papel, "senha_hash": generate_password_hash(senha)}
+    if prof_nome:
+        novo["professor"] = prof_nome
+    d["usuarios"][usuario] = novo
+    save(d)
+    return jsonify({"ok": True})
+
+def _alvo_gerenciavel(d, usuario):
+    """Retorna (alvo, erro). Secretária só gerencia professores."""
+    alvo = d["usuarios"].get(usuario)
+    if alvo is None:
+        return None, (jsonify({"erro": "Usuário não encontrado."}), 404)
+    papel_atual = papel_do_usuario(_usuario_atual(d))
+    if papel_atual == "secretaria" and papel_do_usuario(alvo) != "professor":
+        return None, (jsonify({"erro": "Você não tem permissão para gerenciar este usuário."}), 403)
+    return alvo, None
+
+@app.route("/api/usuarios/<usuario>", methods=["DELETE"])
+@papel_required("admin", "secretaria")
+def excluir_usuario(usuario):
+    d = load()
+    usuario = str(usuario).strip()
+    alvo, erro = _alvo_gerenciavel(d, usuario)
+    if erro:
+        return erro
+    if usuario == session.get("usuario"):
+        return jsonify({"erro": "Você não pode excluir o próprio usuário."}), 400
+    if usuario == "admin":
+        return jsonify({"erro": "O usuário admin não pode ser excluído."}), 400
+    del d["usuarios"][usuario]
+    save(d)
+    return jsonify({"ok": True})
+
+@app.route("/api/usuarios/<usuario>/senha", methods=["POST"])
+@papel_required("admin", "secretaria")
+def redefinir_senha(usuario):
+    d = load()
+    usuario = str(usuario).strip()
+    alvo, erro = _alvo_gerenciavel(d, usuario)
+    if erro:
+        return erro
+    nova = str((request.json or {}).get("nova_senha", ""))
+    if len(nova) < 6:
+        return jsonify({"erro": "A nova senha deve ter pelo menos 6 caracteres."}), 400
+    alvo["senha_hash"] = generate_password_hash(nova)
     save(d)
     return jsonify({"ok": True})
 
@@ -591,7 +884,7 @@ def trocar_senha():
     return jsonify({"ok": True})
 
 @app.route("/api/logo", methods=["POST"])
-@login_required
+@papel_required("admin")
 def upload_logo():
     d = load()
     imagem = (request.json or {}).get("imagem", "")
@@ -612,7 +905,7 @@ def upload_logo():
     return jsonify({"ok": True})
 
 @app.route("/api/logo", methods=["DELETE"])
-@login_required
+@papel_required("admin")
 def remover_logo():
     d = load()
     d.setdefault("config", {})
@@ -622,7 +915,7 @@ def remover_logo():
     return jsonify({"ok": True})
 
 @app.route("/api/turmas", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def add_turma():
     d = load()
     nome = sanitize(request.json.get("nome", ""))
@@ -635,13 +928,14 @@ def add_turma():
     return jsonify({"ok": True})
 
 @app.route("/api/turmas/<nome>", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def del_turma(nome):
     d = load()
     nome = sanitize(nome)
     if nome not in d["turmas"]:
         return jsonify({"erro": "Turma não encontrada."}), 404
     del d["turmas"][nome]
+    d["atribuicoes"] = [a for a in d.get("atribuicoes", []) if a.get("turma") != nome]
     for aluno in d["alunos"].values():
         if aluno.get("turma") == nome:
             aluno["turma"] = ""
@@ -649,7 +943,7 @@ def del_turma(nome):
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/<matricula>/turma", methods=["POST"])
-@login_required
+@papel_required("admin", "secretaria")
 def assoc_turma(matricula):
     d = load()
     matricula = sanitize(matricula)
@@ -663,7 +957,7 @@ def assoc_turma(matricula):
     return jsonify({"ok": True})
 
 @app.route("/api/alunos/<matricula>/turma", methods=["DELETE"])
-@login_required
+@papel_required("admin", "secretaria")
 def desassoc_turma(matricula):
     d = load()
     matricula = sanitize(matricula)
@@ -674,36 +968,62 @@ def desassoc_turma(matricula):
     return jsonify({"ok": True})
 
 @app.route("/api/chamada", methods=["POST"])
-@login_required
+@papel_required("admin", "professor")
 def salvar_chamada():
     d = load()
-    body = request.json
+    ud = _usuario_atual(d)
+    body = request.json or {}
     materia = sanitize(body.get("materia", ""))
     data = sanitize(body.get("data", ""))
     presencas = body.get("presencas", {})
     if materia not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
+    if not data or not isinstance(presencas, dict):
+        return jsonify({"erro": "Dados inválidos."}), 400
+    permitidas = None
+    if papel_do_usuario(ud) == "professor":
+        permitidas = turmas_permitidas(d, ud, materia)
+        if not permitidas:
+            return jsonify({"erro": "Você não leciona esta matéria."}), 403
     chamadas = d["materias"][materia].setdefault("chamadas", {})
     for mat, presente in presencas.items():
-        chamadas.setdefault(sanitize(mat), {})[data] = bool(presente)
+        mat = sanitize(mat)
+        aluno = d["alunos"].get(mat)
+        if aluno is None:
+            continue
+        if permitidas is not None and (aluno.get("turma", "") not in permitidas
+                                       or materia not in aluno.get("materias", [])):
+            continue
+        chamadas.setdefault(mat, {})[data] = bool(presente)
     save(d)
     return jsonify({"ok": True})
 
 @app.route("/api/notas", methods=["POST"])
-@login_required
+@papel_required("admin", "professor")
 def salvar_notas():
     d = load()
-    body = request.json
+    ud = _usuario_atual(d)
+    body = request.json or {}
     materia = sanitize(body.get("materia", ""))
     if materia not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
     input_notas = body.get("notas", {})
     if not isinstance(input_notas, dict):
         return jsonify({"erro": "Dados inválidos."}), 400
-    sanitized_notas = {}
+    permitidas = None
+    if papel_do_usuario(ud) == "professor":
+        permitidas = turmas_permitidas(d, ud, materia)
+        if not permitidas:
+            return jsonify({"erro": "Você não leciona esta matéria."}), 403
+    # Mescla por aluno: alunos que não vieram na requisição (ex.: de outra turma) mantêm as notas.
+    notas_materia = d["materias"][materia].setdefault("notas", {})
     for mat_aluno, evals in input_notas.items():
         mat_aluno = sanitize(mat_aluno)
-        if mat_aluno not in d["alunos"]:
+        aluno = d["alunos"].get(mat_aluno)
+        if aluno is None:
+            continue
+        if permitidas is not None and (aluno.get("turma", "") not in permitidas
+                                       or materia not in aluno.get("materias", [])):
             continue
         if not isinstance(evals, dict):
             continue
@@ -720,9 +1040,9 @@ def salvar_notas():
                     aluno_grades[aval] = n
             except (ValueError, TypeError):
                 pass
+        notas_materia.pop(mat_aluno, None)
         if aluno_grades:
-            sanitized_notas[mat_aluno] = aluno_grades
-    d["materias"][materia]["notas"] = sanitized_notas
+            notas_materia[mat_aluno] = aluno_grades
     save(d)
     return jsonify({"ok": True})
 
@@ -826,7 +1146,7 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
                 val = "P"
             elif presente is False:
                 val = "F"
-                faltas += 1
+                faltas += AULAS_POR_DIA  # cada dia de aula = 4 horas-aula
             else:
                 val = ""
             ws.cell(row, col_first_data + i, val).alignment = center
@@ -845,7 +1165,7 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
         row += 1
 
     if n_datas:
-        nota = ws.cell(row + 1, 1, "Legenda: P = presente   F = falta")
+        nota = ws.cell(row + 1, 1, f"Legenda: P = presente   F = falta   |   cada dia de aula = {AULAS_POR_DIA} horas-aula (faltas em horas-aula)")
         nota.font = Font(italic=True, size=9, color="64748B")
 
     ws.column_dimensions[get_column_letter(COL_NUM)].width = 5
@@ -891,7 +1211,7 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
     ws2.cell(r, 1, "Aulas previstas:").font = bold
     r += 1
     ws2.cell(r, 1, "Aulas dadas:").font = bold
-    ws2.cell(r, 3, len(datas))
+    ws2.cell(r, 3, len(datas) * AULAS_POR_DIA)
     r += 1
     ws2.cell(r, 1, "Encerrado em:").font = bold
     r += 2
@@ -905,7 +1225,7 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
     return wb
 
 @app.route("/api/diario", methods=["GET"])
-@login_required
+@papel_required("admin", "secretaria", "professor")
 def gerar_diario():
     d = load()
     turma = sanitize(request.args.get("turma", ""))
@@ -917,6 +1237,9 @@ def gerar_diario():
         return jsonify({"erro": "Matéria não encontrada."}), 404
     if not turma or turma not in d["turmas"]:
         return jsonify({"erro": "Turma não encontrada."}), 404
+    ud = _usuario_atual(d)
+    if papel_do_usuario(ud) == "professor" and turma not in turmas_permitidas(d, ud, materia):
+        return jsonify({"erro": "Você não tem permissão para esta turma/matéria."}), 403
 
     alunos = [(mat, a) for mat, a in d["alunos"].items()
               if materia in a.get("materias", []) and a.get("turma", "") == turma]
@@ -928,7 +1251,8 @@ def gerar_diario():
     chamadas = mat_dados.get("chamadas", {})
     notas = mat_dados.get("notas", {})
     conteudos = mat_dados.get("conteudos", {})
-    datas_chamada = {data for reg in chamadas.values() for data in reg.keys()}
+    ids_turma = {mat for mat, _ in alunos}
+    datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
     avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
     ano = datetime.datetime.now().year
@@ -941,7 +1265,7 @@ def gerar_diario():
         except Exception:
             logo_bytes = None
 
-    wb = gerar_diario_workbook(instituicao, curso, materia, mat_dados.get("professor", ""), turma, ano, alunos, datas, chamadas, avals, notas, conteudos, logo_bytes)
+    wb = gerar_diario_workbook(instituicao, curso, materia, professor_da_turma(d, turma, materia), turma, ano, alunos, datas, chamadas, avals, notas, conteudos, logo_bytes)
 
     buf = BytesIO()
     wb.save(buf)
@@ -951,7 +1275,7 @@ def gerar_diario():
                       mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.route("/api/diario/pdf", methods=["GET"])
-@login_required
+@papel_required("admin", "secretaria", "professor")
 def gerar_diario_pdf_rota():
     d = load()
     turma = sanitize(request.args.get("turma", ""))
@@ -963,6 +1287,9 @@ def gerar_diario_pdf_rota():
         return jsonify({"erro": "Matéria não encontrada."}), 404
     if not turma or turma not in d["turmas"]:
         return jsonify({"erro": "Turma não encontrada."}), 404
+    ud = _usuario_atual(d)
+    if papel_do_usuario(ud) == "professor" and turma not in turmas_permitidas(d, ud, materia):
+        return jsonify({"erro": "Você não tem permissão para esta turma/matéria."}), 403
 
     alunos = [(mat, a) for mat, a in d["alunos"].items()
               if materia in a.get("materias", []) and a.get("turma", "") == turma]
@@ -974,7 +1301,8 @@ def gerar_diario_pdf_rota():
     chamadas = mat_dados.get("chamadas", {})
     notas = mat_dados.get("notas", {})
     conteudos = mat_dados.get("conteudos", {})
-    datas_chamada = {data for reg in chamadas.values() for data in reg.keys()}
+    ids_turma = {mat for mat, _ in alunos}
+    datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
     avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
     ano = datetime.datetime.now().year
@@ -987,13 +1315,13 @@ def gerar_diario_pdf_rota():
         except Exception:
             logo_bytes = None
 
-    buf = gerar_diario_pdf(instituicao, curso, materia, mat_dados.get("professor", ""), turma, ano,
+    buf = gerar_diario_pdf(instituicao, curso, materia, professor_da_turma(d, turma, materia), turma, ano,
                            alunos, datas, chamadas, avals, notas, conteudos, logo_bytes)
     nome_arquivo = f"Diario_{turma}_{materia}.pdf".replace(" ", "_")
     return send_file(buf, as_attachment=True, download_name=nome_arquivo, mimetype="application/pdf")
 
 @app.route("/api/backup", methods=["GET"])
-@login_required
+@papel_required("admin")
 def exportar_backup():
     d = load()
     conteudo = json.dumps(d, ensure_ascii=False, indent=2)
@@ -1002,7 +1330,7 @@ def exportar_backup():
     return send_file(buf, as_attachment=True, download_name=nome_arquivo, mimetype="application/json")
 
 @app.route("/api/backup/restaurar", methods=["POST"])
-@login_required
+@papel_required("admin")
 def restaurar_backup():
     body = request.json or {}
     novo = body.get("dados")
@@ -1018,6 +1346,8 @@ def restaurar_backup():
         novo["usuarios"] = load().get("usuarios", {})
     if "config" not in novo or not isinstance(novo.get("config"), dict):
         novo["config"] = {}
+    if not isinstance(novo.get("atribuicoes"), list):
+        novo["atribuicoes"] = []
 
     save(novo)
     return jsonify({"ok": True})
