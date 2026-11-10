@@ -478,27 +478,31 @@ tr.group-row td {
 <header class="app-header">
   <h1>Sistema Escolar</h1>
   <div style="display: flex; align-items: center; gap: 1rem;">
-    <span style="font-size: 14px; color: #64748b; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;"><i class="ti ti-user" style="font-size: 16px;"></i> Olá, {{ session.get('nome', 'Usuário') }}</span>
+    <span style="font-size: 14px; color: #64748b; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;"><i class="ti ti-user" style="font-size: 16px;"></i> Olá, {{ session.get('nome', 'Usuário') }} <span id="eu-papel" class="badge" style="margin:0"></span></span>
     <a href="#" onclick="abrirModalSenha();return false;" class="btn-logout" style="background:#f1f5f9; color:#475569"><i class="ti ti-key"></i> Trocar senha</a>
     <a href="/logout" class="btn-logout"><i class="ti ti-logout"></i> Sair</a>
   </div>
 </header>
 
-<div class="tabs-container">
+<div class="tabs-container" style="visibility:hidden">
   <div class="tabs">
-    <button class="tab active" onclick="showTab('alunos',this)">Alunos</button>
-    <button class="tab" onclick="showTab('turmas',this)">Turmas</button>
-    <button class="tab" onclick="showTab('materias',this)">Matérias</button>
-    <button class="tab" onclick="showTab('assoc',this)">Associar</button>
-    <button class="tab" onclick="showTab('chamada',this)">Chamada</button>
-    <button class="tab" onclick="showTab('notas',this)">Notas</button>
-    <button class="tab" onclick="showTab('boletim',this)">Boletim</button>
-    <button class="tab" onclick="showTab('diario',this)">Diário</button>
-    <button class="tab" onclick="showTab('backup',this)">Backup</button>
+    <button class="tab active" data-papeis="admin,secretaria" onclick="showTab('alunos',this)">Alunos</button>
+    <button class="tab" data-papeis="admin,secretaria" onclick="showTab('turmas',this)">Turmas</button>
+    <button class="tab" data-papeis="admin,secretaria" onclick="showTab('professores',this)">Professores</button>
+    <button class="tab" data-papeis="admin,secretaria" onclick="showTab('materias',this)">Matérias</button>
+    <button class="tab" data-papeis="admin,secretaria" onclick="showTab('atribuicoes',this)">Atribuições</button>
+    <button class="tab" data-papeis="admin,secretaria" onclick="showTab('assoc',this)">Associar</button>
+    <button class="tab" data-papeis="admin,professor" onclick="showTab('conteudo',this)">Conteúdo</button>
+    <button class="tab" data-papeis="admin,professor" onclick="showTab('chamada',this)">Chamada</button>
+    <button class="tab" data-papeis="admin,professor" onclick="showTab('notas',this)">Notas</button>
+    <button class="tab" data-papeis="admin,secretaria,professor" onclick="showTab('boletim',this)">Boletim</button>
+    <button class="tab" data-papeis="admin,secretaria,professor" onclick="showTab('diario',this)">Diário</button>
+    <button class="tab" data-papeis="admin" onclick="showTab('usuarios',this)">Usuários</button>
+    <button class="tab" data-papeis="admin" onclick="showTab('backup',this)">Backup</button>
   </div>
 </div>
 
-<main class="main-content">
+<main class="main-content" style="visibility:hidden">
   <!-- SEÇÃO: ALUNOS -->
   <div id="sec-alunos" class="section active">
     <h2 class="section-title">Alunos</h2>
@@ -594,6 +598,50 @@ tr.group-row td {
     </div>
   </div>
 
+  <!-- SEÇÃO: PROFESSORES -->
+  <div id="sec-professores" class="section">
+    <h2 class="section-title">Professores</h2>
+    <div class="card">
+      <h3>Cadastrar professor</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="p-nome" placeholder="Nome do professor">
+        </div>
+      </div>
+      <p style="font-size:13px; color:#64748b; margin:8px 0 12px">
+        Para o professor entrar no sistema, informe também um usuário e uma senha. É opcional: o acesso pode ser criado depois, na lista abaixo.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="p-usuario" placeholder="Usuário de acesso (opcional)" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <input id="p-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" onclick="addProfessor()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="p-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Professores cadastrados</h3>
+      <div class="table-container">
+        <table id="t-professores">
+          <thead>
+            <tr>
+              <th>Professor</th>
+              <th>Acesso</th>
+              <th class="text-center">Atribuições</th>
+              <th style="width: 110px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum professor cadastrado.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- SEÇÃO: MATÉRIAS -->
   <div id="sec-materias" class="section">
     <h2 class="section-title">Matérias</h2>
@@ -602,9 +650,6 @@ tr.group-row td {
       <div class="form-row">
         <div class="form-group">
           <input id="m-nome" placeholder="Nome da matéria">
-        </div>
-        <div class="form-group">
-          <input id="m-prof" placeholder="Professor responsável">
         </div>
         <button class="btn btn-primary" onclick="addMateria()"><i class="ti ti-plus"></i> Cadastrar</button>
       </div>
@@ -617,7 +662,7 @@ tr.group-row td {
           <thead>
             <tr>
               <th>Matéria</th>
-              <th>Professor</th>
+              <th>Professor(es)</th>
               <th style="width: 80px;" class="text-center">Ações</th>
             </tr>
           </thead>
@@ -626,30 +671,6 @@ tr.group-row td {
           </tbody>
         </table>
       </div>
-    </div>
-    <div class="card">
-      <h3>Conteúdo lecionado</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Matéria</label>
-          <select id="cl-mat" onchange="renderConteudos()">
-            <option value="">Selecione a matéria</option>
-          </select>
-        </div>
-        <div class="form-group small">
-          <label>Data da aula</label>
-          <input type="date" id="cl-data">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="min-width:100%">
-          <label>Conteúdo lecionado</label>
-          <textarea id="cl-texto" placeholder="O que foi ensinado nesta aula..."></textarea>
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="salvarConteudo()"><i class="ti ti-plus"></i> Salvar</button>
-      <div class="msg" id="cl-msg"></div>
-      <div id="cl-lista" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -706,6 +727,101 @@ tr.group-row td {
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: ATRIBUIÇÕES -->
+  <div id="sec-atribuicoes" class="section">
+    <h2 class="section-title">Atribuições</h2>
+    <div class="card">
+      <h3>Atribuir professor a turma e matéria</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Cada turma tem um professor por matéria. O professor só enxerga e lança chamada, notas e conteúdo das turmas/matérias que lhe forem atribuídas aqui.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <select id="at-prof">
+            <option value="">Selecione o professor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="at-turma">
+            <option value="">Selecione a turma</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="at-mat">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="addAtribuicao()"><i class="ti ti-link"></i> Atribuir</button>
+      </div>
+      <div class="check-row" style="padding:8px 0; border-bottom:none">
+        <input type="checkbox" id="at-associar" checked>
+        <label for="at-associar">Associar também os alunos desta turma à matéria</label>
+      </div>
+      <div class="msg" id="at-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Atribuições cadastradas</h3>
+      <div class="table-container">
+        <table id="t-atribuicoes">
+          <thead>
+            <tr>
+              <th>Turma</th>
+              <th>Matéria</th>
+              <th>Professor</th>
+              <th style="width: 80px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhuma atribuição cadastrada.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: CONTEÚDO LECIONADO -->
+  <div id="sec-conteudo" class="section">
+    <h2 class="section-title">Conteúdo lecionado</h2>
+    <div class="card">
+      <h3>Conteúdo lecionado</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Matéria</label>
+          <select id="cl-mat" onchange="renderConteudos()">
+            <option value="">Selecione a matéria</option>
+          </select>
+        </div>
+        <div class="form-group small">
+          <label>Data da aula</label>
+          <input type="date" id="cl-data">
+        </div>
+        <div class="form-group small">
+          <label>Até (opcional)</label>
+          <input type="date" id="cl-data-fim">
+        </div>
+        <button class="btn btn-blue" onclick="adicionarDatasConteudo()"><i class="ti ti-calendar-plus"></i> Adicionar data</button>
+      </div>
+      <div class="check-row" style="padding:6px 0; border-bottom:none">
+        <input type="checkbox" id="cl-pular-fds" checked>
+        <label for="cl-pular-fds">Ao usar “Até”, ignorar sábados e domingos</label>
+      </div>
+      <div id="cl-datas" style="margin:8px 0 14px"></div>
+      <div class="form-row">
+        <div class="form-group" style="min-width:100%">
+          <label>Conteúdo lecionado</label>
+          <textarea id="cl-texto" placeholder="O que foi ensinado nesta aula..."></textarea>
+        </div>
+      </div>
+      <div class="check-row" style="padding:6px 0; border-bottom:none">
+        <input type="checkbox" id="cl-copiar-chamada">
+        <label for="cl-copiar-chamada">Usar a mesma chamada em todas as datas (copia a chamada da primeira data que já tiver chamada registrada)</label>
+      </div>
+      <button class="btn btn-primary" onclick="salvarConteudo()"><i class="ti ti-plus"></i> Salvar</button>
+      <div class="msg" id="cl-msg"></div>
+      <div id="cl-lista" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -776,7 +892,7 @@ tr.group-row td {
   <!-- SEÇÃO: DIÁRIO -->
   <div id="sec-diario" class="section">
     <h2 class="section-title">Diário</h2>
-    <div class="card">
+    <div class="card" data-papeis="admin">
       <h3>Logotipo da instituição</h3>
       <p style="font-size:13px; color:#64748b; margin-bottom:14px">
         Aparece no topo de todo Diário exportado. Aceita PNG ou JPG, até 2MB.
@@ -794,7 +910,7 @@ tr.group-row td {
     <div class="card">
       <h3>Exportar Diário de Classe</h3>
       <p style="font-size:13px; color:#64748b; margin-bottom:14px">
-        Gera o diário com a lista de alunos, frequência, avaliações, médias e faltas da turma/matéria escolhida, em planilha (.xlsx) ou em PDF.
+        Gera o diário com a lista de alunos, frequência, avaliações, médias e faltas da turma/matéria escolhida, em planilha (.xlsx) ou em PDF. Cada dia de aula conta como 4 horas-aula (aulas dadas e faltas).
       </p>
       <div class="form-row">
         <div class="form-group">
@@ -819,6 +935,56 @@ tr.group-row td {
       <button class="btn btn-primary" onclick="baixarDiario()"><i class="ti ti-download"></i> Baixar Diário (.xlsx)</button>
       <button class="btn btn-blue" onclick="baixarDiarioPDF()" style="margin-left:8px"><i class="ti ti-file-type-pdf"></i> Baixar PDF</button>
       <div class="msg" id="dr-msg"></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO: USUÁRIOS -->
+  <div id="sec-usuarios" class="section">
+    <h2 class="section-title">Usuários</h2>
+    <div class="card">
+      <h3>Cadastrar usuário</h3>
+      <p style="font-size:13px; color:#64748b; margin-bottom:14px">
+        Cadastre aqui as secretárias (e outros administradores). Os acessos dos professores são criados na aba Professores.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <input id="u-nome" placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <input id="u-usuario" placeholder="Usuário (3 a 30 caracteres)" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <input id="u-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group small">
+          <select id="u-papel">
+            <option value="secretaria">Secretária</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="addUsuario()"><i class="ti ti-plus"></i> Cadastrar</button>
+      </div>
+      <div class="msg" id="u-msg"></div>
+    </div>
+    <div class="card">
+      <h3>Usuários cadastrados</h3>
+      <div class="table-container">
+        <table id="t-usuarios">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Usuário</th>
+              <th>Perfil</th>
+              <th style="width: 110px;" class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="color:#94a3b8" class="text-center">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -878,6 +1044,19 @@ tr.group-row td {
   </div>
 </div>
 
+<div class="modal-bg" id="modal-acesso" style="display:none">
+  <div class="modal">
+    <h3 id="ac-titulo">Criar acesso</h3>
+    <input id="ac-usuario" placeholder="Usuário (3 a 30 caracteres)" autocomplete="off" style="margin-bottom:10px">
+    <input id="ac-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
+    <div class="msg" id="ac-msg"></div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn" style="background:#f1f5f9; color:#475569" onclick="fecharModalAcesso()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarAcesso()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let dados={alunos:{},materias:{},turmas:{}};
 let editandoId=null;
@@ -892,9 +1071,12 @@ async function api(url,method='GET',body=null){
 
 async function refresh(){
   dados=await api('/api/dados');
+  aplicarPermissoes();
   renderAlunos();
   renderTurmas();
+  renderProfessores();
   renderMaterias();
+  renderAtribuicoes();
   renderAssoc();
   populateSelects();
   renderConteudos();
@@ -909,6 +1091,7 @@ function showTab(id,el){
   if(id==='boletim') loadBoletim();
   if(id==='notas') loadNotas();
   if(id==='chamada') loadChamada();
+  if(id==='usuarios') loadUsuarios();
 }
 
 function calcMedia(notas){
@@ -1010,7 +1193,7 @@ function renderMaterias(){
   tb.innerHTML=rows.map(([nome,m])=>`
     <tr>
       <td class="font-medium">${nome}</td>
-      <td>${m.professor||'—'}</td>
+      <td>${professoresDaMateria(nome)}</td>
       <td class="text-center">
         <button class="btn-icon btn-delete" onclick="delMateria('${nome}')"><i class="ti ti-trash"></i></button>
       </td>
@@ -1086,6 +1269,10 @@ function populateSelects(){
   const v5=imps.value;
   imps.innerHTML='<option value="">Sem turma padrão</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   imps.value=v5;
+
+  preencherSelect('at-prof','Selecione o professor',Object.keys(dados.professores||{}).sort((a,b)=>a.localeCompare(b,'pt-BR')));
+  preencherSelect('at-turma','Selecione a turma',turmas);
+  preencherSelect('at-mat','Selecione a matéria',mats);
 }
 
 function abrirModal(id,nome,turma){
@@ -1279,14 +1466,12 @@ async function associarTurma(){
 
 async function addMateria(){
   const nome=document.getElementById('m-nome').value.trim();
-  const prof=document.getElementById('m-prof').value.trim();
-  const r=await api('/api/materias','POST',{nome,professor:prof});
+  const r=await api('/api/materias','POST',{nome});
   const msg=document.getElementById('m-msg');
   if(r.ok){
     msg.style.color='#10b981';
     msg.textContent='Matéria cadastrada com sucesso!';
     document.getElementById('m-nome').value='';
-    document.getElementById('m-prof').value='';
     refresh();
   }else{
     msg.style.color='#ef4444';
@@ -1330,25 +1515,107 @@ function renderConteudos(){
   `).join('');
 }
 
-async function salvarConteudo(){
-  const materia=document.getElementById('cl-mat').value;
-  const data=document.getElementById('cl-data').value;
-  const texto=document.getElementById('cl-texto').value.trim();
+// ----- Conteúdo lecionado: uma ou várias datas
+let clDatas=[];
+
+function _isoDia(ms){ return new Date(ms).toISOString().slice(0,10); }
+
+function _msgConteudo(texto,cor){
   const msg=document.getElementById('cl-msg');
-  if(!materia||!data||!texto){
-    msg.style.color='#ef4444';
-    msg.textContent='Selecione a matéria, a data e descreva o conteúdo.';
+  msg.style.color=cor;
+  msg.textContent=texto;
+}
+
+function adicionarDatasConteudo(){
+  const ini=document.getElementById('cl-data').value;
+  const fim=document.getElementById('cl-data-fim').value;
+  const pular=document.getElementById('cl-pular-fds').checked;
+  if(!ini){ _msgConteudo('Escolha a data da aula.','#ef4444'); return; }
+  let novas=[];
+  if(fim){
+    if(fim<ini){ _msgConteudo('A data final não pode ser anterior à inicial.','#ef4444'); return; }
+    const [y,m,d]=ini.split('-').map(Number);
+    const [y2,m2,d2]=fim.split('-').map(Number);
+    const tf=Date.UTC(y2,m2-1,d2);
+    for(let t=Date.UTC(y,m-1,d); t<=tf && novas.length<=62; t+=86400000){
+      const dow=new Date(t).getUTCDay();
+      if(pular&&(dow===0||dow===6)) continue;
+      novas.push(_isoDia(t));
+    }
+  }else{
+    novas=[ini];
+  }
+  if(!novas.length){ _msgConteudo('Nenhum dia útil nesse período.','#ef4444'); return; }
+  const uniao=[...new Set([...clDatas,...novas])].sort();
+  if(uniao.length>62){ _msgConteudo('Máximo de 62 datas por vez.','#ef4444'); return; }
+  clDatas=uniao;
+  document.getElementById('cl-data-fim').value='';
+  _msgConteudo('','#64748b');
+  renderDatasConteudo();
+}
+
+function removerDataConteudo(iso){
+  clDatas=clDatas.filter(x=>x!==iso);
+  renderDatasConteudo();
+}
+
+function limparDatasConteudo(){
+  clDatas=[];
+  renderDatasConteudo();
+}
+
+function renderDatasConteudo(){
+  const div=document.getElementById('cl-datas');
+  if(!div) return;
+  if(!clDatas.length){
+    div.innerHTML='<span style="font-size:13px; color:#94a3b8">Nenhuma data adicionada: será usada a “Data da aula” acima. Para a mesma aula em vários dias, use “Adicionar data” (ou preencha “Até” para um período).</span>';
     return;
   }
-  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{data,conteudo:texto});
+  const apd=dados.aulas_por_dia||4;
+  div.innerHTML=clDatas.map(d=>`<span class="badge" style="display:inline-flex; align-items:center; gap:4px">${_fmtDataBR(d)}<button class="btn-icon" title="Remover" style="padding:0 2px; font-size:14px; color:#64748b" onclick="removerDataConteudo('${d}')">×</button></span>`).join('')
+    +`<button class="btn-icon" style="font-size:12px; color:#2563eb" onclick="limparDatasConteudo()">limpar todas</button>`
+    +`<div style="font-size:12px; color:#64748b; margin-top:6px">${clDatas.length} data(s) selecionada(s) = ${clDatas.length*apd} horas-aula no Diário</div>`;
+}
+
+async function salvarConteudo(){
+  const materia=document.getElementById('cl-mat').value;
+  const texto=document.getElementById('cl-texto').value.trim();
+  let datas=[...clDatas];
+  if(!datas.length){
+    const unica=document.getElementById('cl-data').value;
+    if(unica) datas=[unica];
+  }
+  if(!materia||!datas.length||!texto){
+    _msgConteudo('Selecione a matéria, a(s) data(s) e descreva o conteúdo.','#ef4444');
+    return;
+  }
+  const matDados=dados.materias[materia]||{};
+  const copiar=document.getElementById('cl-copiar-chamada').checked&&datas.length>1;
+  const avisos=[];
+  const jaTem=datas.filter(d=>(matDados.conteudos||{})[d]);
+  if(jaTem.length) avisos.push(`${jaTem.length} data(s) já têm conteúdo lecionado e serão substituídas.`);
+  if(copiar){
+    const comChamada=new Set(Object.values(matDados.chamadas||{}).flatMap(r=>Object.keys(r)));
+    const origem=datas.find(d=>comChamada.has(d));
+    if(!origem){
+      _msgConteudo('Nenhuma das datas selecionadas tem chamada registrada. Registre a chamada de uma delas na aba Chamada.','#ef4444');
+      return;
+    }
+    const outras=datas.filter(d=>d!==origem&&comChamada.has(d));
+    if(outras.length) avisos.push(`${outras.length} data(s) já têm chamada registrada e serão substituídas pela chamada de ${_fmtDataBR(origem)}.`);
+  }
+  if(avisos.length&&!confirm(avisos.join('\n')+'\n\nContinuar?')) return;
+  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{datas,conteudo:texto,copiar_chamada:copiar});
   if(r.ok){
-    msg.style.color='#10b981';
-    msg.textContent='Conteúdo salvo com sucesso!';
+    let t=r.datas>1?`Conteúdo salvo em ${r.datas} datas!`:'Conteúdo salvo com sucesso!';
+    if(r.chamada_origem) t+=` A chamada de ${_fmtDataBR(r.chamada_origem)} foi copiada para as demais datas.`;
+    _msgConteudo(t,'#10b981');
     document.getElementById('cl-texto').value='';
+    clDatas=[];
+    renderDatasConteudo();
     await refresh();
   }else{
-    msg.style.color='#ef4444';
-    msg.textContent=r.erro;
+    _msgConteudo(r.erro,'#ef4444');
   }
 }
 
@@ -1827,6 +2094,269 @@ async function restaurarBackup(){
   reader.readAsText(file);
 }
 
+const PAPEL_LABEL={admin:'Administrador',secretaria:'Secretária',professor:'Professor'};
+
+// Mostra/oculta abas e cartões conforme o perfil (data-papeis="admin,secretaria,...").
+// A segurança de verdade está no servidor; isto só organiza a tela.
+function aplicarPermissoes(){
+  const papel=(dados.eu||{}).papel||'';
+  document.querySelectorAll('[data-papeis]').forEach(el=>{
+    el.style.display=el.dataset.papeis.split(',').includes(papel)?'':'none';
+  });
+  const badge=document.getElementById('eu-papel');
+  if(badge) badge.textContent=PAPEL_LABEL[papel]||'';
+  const ativa=document.querySelector('.tab.active');
+  if(!ativa||ativa.style.display==='none'){
+    const primeira=[...document.querySelectorAll('.tab')].find(t=>t.style.display!=='none');
+    if(primeira) primeira.click();
+  }
+  document.querySelector('.tabs-container').style.visibility='visible';
+  document.querySelector('.main-content').style.visibility='visible';
+}
+
+function preencherSelect(id,placeholder,valores){
+  const s=document.getElementById(id);
+  if(!s) return;
+  const v=s.value;
+  s.innerHTML=`<option value="">${placeholder}</option>`+valores.map(x=>`<option value="${x}">${x}</option>`).join('');
+  s.value=v;
+}
+
+function professoresDaMateria(nome){
+  const ps=[...new Set((dados.atribuicoes||[]).filter(a=>a.materia===nome).map(a=>a.professor))];
+  if(ps.length) return ps.join(', ');
+  return dados.materias[nome]?.professor||'—';
+}
+
+function renderProfessores(){
+  const tb=document.querySelector('#t-professores tbody');
+  if(!tb) return;
+  const nomes=Object.keys(dados.professores||{}).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(!nomes.length){
+    tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum professor cadastrado.</td></tr>';
+    return;
+  }
+  const logins=dados.logins_professores||{};
+  tb.innerHTML=nomes.map(nome=>{
+    const login=logins[nome];
+    const qtd=(dados.atribuicoes||[]).filter(a=>a.professor===nome).length;
+    const acesso=login?`<span class="badge">${login}</span>`:'<span style="color:#94a3b8">Sem acesso</span>';
+    const btnAcesso=login
+      ?`<button class="btn-icon btn-edit" title="Redefinir senha" data-usuario="${login}" onclick="abrirModalAcesso('redefinir',this.dataset.usuario)"><i class="ti ti-key"></i></button>`
+      :`<button class="btn-icon btn-edit" title="Criar acesso" data-prof="${nome}" onclick="abrirModalAcesso('criar',null,this.dataset.prof)"><i class="ti ti-user-plus"></i></button>`;
+    return `
+    <tr>
+      <td class="font-medium">${nome}</td>
+      <td>${acesso}</td>
+      <td class="text-center">${qtd}</td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        ${btnAcesso}
+        <button class="btn-icon btn-delete" title="Excluir" data-prof="${nome}" onclick="delProfessor(this.dataset.prof)"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function addProfessor(){
+  const nome=document.getElementById('p-nome').value.trim();
+  const usuario=document.getElementById('p-usuario').value.trim();
+  const senha=document.getElementById('p-senha').value;
+  const msg=document.getElementById('p-msg');
+  if(!nome){
+    msg.style.color='#ef4444';
+    msg.textContent='Informe o nome do professor.';
+    return;
+  }
+  if((usuario&&!senha)||(!usuario&&senha)){
+    msg.style.color='#ef4444';
+    msg.textContent='Para criar o acesso, informe usuário e senha (ou deixe os dois em branco).';
+    return;
+  }
+  const r=await api('/api/professores','POST',{nome});
+  if(!r.ok){
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+    return;
+  }
+  let texto='Professor cadastrado com sucesso!';
+  let cor='#10b981';
+  if(usuario){
+    const r2=await api('/api/usuarios','POST',{papel:'professor',professor:nome,nome,usuario,senha});
+    if(r2.ok){
+      texto+=' Acesso criado.';
+    }else{
+      texto+=' Mas o acesso não foi criado: '+r2.erro+' Use o botão de acesso na lista para tentar de novo.';
+      cor='#f59e0b';
+    }
+  }
+  msg.style.color=cor;
+  msg.textContent=texto;
+  ['p-nome','p-usuario','p-senha'].forEach(id=>{ document.getElementById(id).value=''; });
+  await refresh();
+}
+
+async function delProfessor(nome){
+  if(!confirm('Excluir este professor? As atribuições e o acesso dele ao sistema também serão removidos.'))return;
+  await api('/api/professores/'+encodeURIComponent(nome),'DELETE');
+  await refresh();
+}
+
+// ----- Modal: criar acesso de professor / redefinir senha
+let acessoCtx=null;
+function abrirModalAcesso(modo,usuario,professor){
+  acessoCtx={modo,usuario,professor};
+  const campoUsuario=document.getElementById('ac-usuario');
+  document.getElementById('ac-titulo').textContent=modo==='criar'?'Criar acesso do professor':'Redefinir senha';
+  campoUsuario.value=usuario||'';
+  campoUsuario.readOnly=modo==='redefinir';
+  document.getElementById('ac-senha').value='';
+  document.getElementById('ac-senha').placeholder=modo==='criar'?'Senha (mín. 6 caracteres)':'Nova senha (mín. 6 caracteres)';
+  document.getElementById('ac-msg').textContent='';
+  document.getElementById('modal-acesso').style.display='flex';
+}
+
+function fecharModalAcesso(){
+  acessoCtx=null;
+  document.getElementById('modal-acesso').style.display='none';
+}
+
+async function salvarAcesso(){
+  const c=acessoCtx;
+  if(!c) return;
+  const usuario=document.getElementById('ac-usuario').value.trim();
+  const senha=document.getElementById('ac-senha').value;
+  const msg=document.getElementById('ac-msg');
+  if(!usuario||!senha){
+    msg.style.color='#ef4444';
+    msg.textContent='Preencha usuário e senha.';
+    return;
+  }
+  let r;
+  if(c.modo==='criar'){
+    r=await api('/api/usuarios','POST',{papel:'professor',professor:c.professor,nome:c.professor,usuario,senha});
+  }else{
+    r=await api('/api/usuarios/'+encodeURIComponent(c.usuario)+'/senha','POST',{nova_senha:senha});
+  }
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent=c.modo==='criar'?'Acesso criado!':'Senha redefinida!';
+    setTimeout(fecharModalAcesso,1200);
+    await refresh();
+    loadUsuarios();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+// ----- Atribuições (professor x turma x matéria)
+function renderAtribuicoes(){
+  const tb=document.querySelector('#t-atribuicoes tbody');
+  if(!tb) return;
+  const rows=[...(dados.atribuicoes||[])].sort((a,b)=>
+    a.turma.localeCompare(b.turma,'pt-BR')||a.materia.localeCompare(b.materia,'pt-BR'));
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhuma atribuição cadastrada.</td></tr>';
+    return;
+  }
+  tb.innerHTML=rows.map(a=>`
+    <tr>
+      <td class="font-medium">${a.turma}</td>
+      <td>${a.materia}</td>
+      <td>${a.professor}</td>
+      <td class="text-center">
+        <button class="btn-icon btn-delete" data-prof="${a.professor}" data-turma="${a.turma}" data-mat="${a.materia}" onclick="delAtribuicao(this.dataset.prof,this.dataset.turma,this.dataset.mat)"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+async function addAtribuicao(){
+  const professor=document.getElementById('at-prof').value;
+  const turma=document.getElementById('at-turma').value;
+  const materia=document.getElementById('at-mat').value;
+  const associar_alunos=document.getElementById('at-associar').checked;
+  const msg=document.getElementById('at-msg');
+  if(!professor||!turma||!materia){
+    msg.style.color='#ef4444';
+    msg.textContent='Selecione professor, turma e matéria.';
+    return;
+  }
+  const r=await api('/api/atribuicoes','POST',{professor,turma,materia,associar_alunos});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Atribuição criada!'+(r.afetados?` ${r.afetados} aluno(s) associado(s) à matéria.`:'');
+    await refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delAtribuicao(professor,turma,materia){
+  if(!confirm('Remover esta atribuição? O professor perde o acesso a esta turma/matéria (alunos, notas e chamadas continuam salvos).'))return;
+  await api('/api/atribuicoes','DELETE',{professor,turma,materia});
+  await refresh();
+}
+
+// ----- Usuários (somente admin)
+async function loadUsuarios(){
+  const tb=document.querySelector('#t-usuarios tbody');
+  if(!tb||(dados.eu||{}).papel!=='admin') return;
+  const r=await api('/api/usuarios');
+  const lista=r.usuarios||[];
+  if(!lista.length){
+    tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum usuário.</td></tr>';
+    return;
+  }
+  tb.innerHTML=lista.map(u=>{
+    const naoExcluir=u.usuario===dados.eu.usuario||u.usuario==='admin';
+    return `
+    <tr>
+      <td class="font-medium">${u.nome}</td>
+      <td>${u.usuario}</td>
+      <td><span class="badge">${PAPEL_LABEL[u.papel]||u.papel}</span></td>
+      <td class="text-center" style="display:flex; justify-content:center; gap:6px">
+        <button class="btn-icon btn-edit" title="Redefinir senha" data-usuario="${u.usuario}" onclick="abrirModalAcesso('redefinir',this.dataset.usuario)"><i class="ti ti-key"></i></button>
+        ${naoExcluir?'':`<button class="btn-icon btn-delete" title="Excluir" data-usuario="${u.usuario}" onclick="delUsuario(this.dataset.usuario)"><i class="ti ti-trash"></i></button>`}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function addUsuario(){
+  const nome=document.getElementById('u-nome').value.trim();
+  const usuario=document.getElementById('u-usuario').value.trim();
+  const senha=document.getElementById('u-senha').value;
+  const papel=document.getElementById('u-papel').value;
+  const msg=document.getElementById('u-msg');
+  if(!nome||!usuario||!senha){
+    msg.style.color='#ef4444';
+    msg.textContent='Preencha nome, usuário e senha.';
+    return;
+  }
+  const r=await api('/api/usuarios','POST',{nome,usuario,senha,papel});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent='Usuário cadastrado com sucesso!';
+    ['u-nome','u-usuario','u-senha'].forEach(id=>{ document.getElementById(id).value=''; });
+    loadUsuarios();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro;
+  }
+}
+
+async function delUsuario(usuario){
+  if(!confirm('Excluir este usuário? Ele perde o acesso ao sistema imediatamente.'))return;
+  const r=await api('/api/usuarios/'+encodeURIComponent(usuario),'DELETE');
+  if(!r.ok) alert(r.erro);
+  await refresh();
+  loadUsuarios();
+}
+
+document.getElementById('modal-acesso').addEventListener('click',function(e){if(e.target===this)fecharModalAcesso();});
+
+renderDatasConteudo();
 refresh();
 </script>
 </body>
