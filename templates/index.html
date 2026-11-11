@@ -609,11 +609,11 @@ tr.group-row td {
         </div>
       </div>
       <p style="font-size:13px; color:#64748b; margin:8px 0 12px">
-        Para o professor entrar no sistema, informe também um usuário e uma senha. É opcional: o acesso pode ser criado depois, na lista abaixo.
+        Para o professor entrar no sistema, informe também um usuário e uma senha. É opcional: o acesso pode ser criado depois, na lista abaixo. O usuário não pode ter espaços nem acentos (exemplo: ricardo.serra).
       </p>
       <div class="form-row">
         <div class="form-group">
-          <input id="p-usuario" placeholder="Usuário de acesso (opcional)" autocomplete="off">
+          <input id="p-usuario" placeholder="Usuário de acesso (opcional, sem espaços nem acentos)" autocomplete="off">
         </div>
         <div class="form-group">
           <input id="p-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
@@ -951,7 +951,7 @@ tr.group-row td {
           <input id="u-nome" placeholder="Nome completo">
         </div>
         <div class="form-group">
-          <input id="u-usuario" placeholder="Usuário (3 a 30 caracteres)" autocomplete="off">
+          <input id="u-usuario" placeholder="Usuário (sem espaços nem acentos)" autocomplete="off">
         </div>
         <div class="form-group">
           <input id="u-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
@@ -1047,7 +1047,7 @@ tr.group-row td {
 <div class="modal-bg" id="modal-acesso" style="display:none">
   <div class="modal">
     <h3 id="ac-titulo">Criar acesso</h3>
-    <input id="ac-usuario" placeholder="Usuário (3 a 30 caracteres)" autocomplete="off" style="margin-bottom:10px">
+    <input id="ac-usuario" placeholder="Usuário (sem espaços nem acentos)" autocomplete="off" style="margin-bottom:10px">
     <input id="ac-senha" type="password" placeholder="Senha (mín. 6 caracteres)" autocomplete="new-password">
     <div class="msg" id="ac-msg"></div>
     <div class="modal-actions" style="margin-top:10px">
@@ -2162,36 +2162,23 @@ async function addProfessor(){
   const usuario=document.getElementById('p-usuario').value.trim();
   const senha=document.getElementById('p-senha').value;
   const msg=document.getElementById('p-msg');
-  if(!nome){
-    msg.style.color='#ef4444';
-    msg.textContent='Informe o nome do professor.';
-    return;
+  const erro=t=>{ msg.style.color='#ef4444'; msg.textContent=t; };
+  if(!nome){ erro('Informe o nome do professor.'); return; }
+  if(usuario||senha){
+    if(!usuario||!senha){ erro('Para criar o acesso, informe usuário e senha (ou deixe os dois em branco).'); return; }
+    const eu=validarUsuarioLogin(usuario);
+    if(eu){ erro(eu); return; }
+    if(senha.length<6){ erro('A senha deve ter pelo menos 6 caracteres.'); return; }
   }
-  if((usuario&&!senha)||(!usuario&&senha)){
-    msg.style.color='#ef4444';
-    msg.textContent='Para criar o acesso, informe usuário e senha (ou deixe os dois em branco).';
-    return;
-  }
-  const r=await api('/api/professores','POST',{nome});
+  const r=await api('/api/professores','POST',{nome,usuario,senha});
   if(!r.ok){
-    msg.style.color='#ef4444';
-    msg.textContent=r.erro;
+    erro(r.erro+' Nada foi cadastrado.');  // os campos continuam preenchidos para corrigir
     return;
   }
-  let texto='Professor cadastrado com sucesso!';
-  let cor='#10b981';
-  if(usuario){
-    const r2=await api('/api/usuarios','POST',{papel:'professor',professor:nome,nome,usuario,senha});
-    if(r2.ok){
-      texto+=' Acesso criado.';
-    }else{
-      texto+=' Mas o acesso não foi criado: '+r2.erro+' Use o botão de acesso na lista para tentar de novo.';
-      cor='#f59e0b';
-    }
-  }
-  msg.style.color=cor;
-  msg.textContent=texto;
+  msg.style.color='#10b981';
+  msg.textContent='Professor cadastrado com sucesso!'+(r.acesso_criado?` Acesso criado. Usuário: ${usuario} (use este usuário para entrar).`:' Ele ainda está sem acesso: use o ícone de pessoa com + na lista para criar.');
   ['p-nome','p-usuario','p-senha'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('p-usuario').placeholder='Usuário de acesso (opcional, sem espaços nem acentos)';
   await refresh();
 }
 
@@ -2201,13 +2188,31 @@ async function delProfessor(nome){
   await refresh();
 }
 
+// ----- Usuário de acesso: sugestão e validação (mesmas regras do servidor)
+function sugerirUsuario(nome){
+  const p=String(nome||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/[^a-z0-9\s]/g,'').trim().split(/\s+/).filter(Boolean);
+  if(!p.length) return '';
+  return (p.length>1?p[0]+'.'+p[p.length-1]:p[0]).slice(0,30);
+}
+
+// Retorna a mensagem de erro (texto) ou '' se o usuário é válido.
+function validarUsuarioLogin(u){
+  if(!u) return 'Informe o usuário.';
+  if(/\s/.test(u)) return 'O usuário não pode ter espaços. Use ponto ou sublinhado no lugar, por exemplo: '+(sugerirUsuario(u)||'ricardo.serra')+'.';
+  if(/[^\x00-\x7F]/.test(u)) return 'O usuário não pode ter acentos nem caracteres especiais. Use só letras sem acento, números, ponto, hífen ou sublinhado.';
+  if(!/^[A-Za-z0-9._-]+$/.test(u)) return 'O usuário só pode ter letras sem acento, números, ponto, hífen ou sublinhado.';
+  if(u.length<3||u.length>30) return 'O usuário deve ter de 3 a 30 caracteres.';
+  return '';
+}
+
 // ----- Modal: criar acesso de professor / redefinir senha
 let acessoCtx=null;
 function abrirModalAcesso(modo,usuario,professor){
   acessoCtx={modo,usuario,professor};
   const campoUsuario=document.getElementById('ac-usuario');
   document.getElementById('ac-titulo').textContent=modo==='criar'?'Criar acesso do professor':'Redefinir senha';
-  campoUsuario.value=usuario||'';
+  campoUsuario.value=usuario||(modo==='criar'?sugerirUsuario(professor||''):'');
   campoUsuario.readOnly=modo==='redefinir';
   document.getElementById('ac-senha').value='';
   document.getElementById('ac-senha').placeholder=modo==='criar'?'Senha (mín. 6 caracteres)':'Nova senha (mín. 6 caracteres)';
@@ -2231,6 +2236,15 @@ async function salvarAcesso(){
     msg.textContent='Preencha usuário e senha.';
     return;
   }
+  if(c.modo==='criar'){
+    const eu=validarUsuarioLogin(usuario);
+    if(eu){ msg.style.color='#ef4444'; msg.textContent=eu; return; }
+  }
+  if(senha.length<6){
+    msg.style.color='#ef4444';
+    msg.textContent='A senha deve ter pelo menos 6 caracteres.';
+    return;
+  }
   let r;
   if(c.modo==='criar'){
     r=await api('/api/usuarios','POST',{papel:'professor',professor:c.professor,nome:c.professor,usuario,senha});
@@ -2239,8 +2253,8 @@ async function salvarAcesso(){
   }
   if(r.ok){
     msg.style.color='#10b981';
-    msg.textContent=c.modo==='criar'?'Acesso criado!':'Senha redefinida!';
-    setTimeout(fecharModalAcesso,1200);
+    msg.textContent=c.modo==='criar'?`Acesso criado! Usuário: ${usuario} (use este usuário para entrar).`:'Senha redefinida!';
+    setTimeout(fecharModalAcesso,2500);
     await refresh();
     loadUsuarios();
   }else{
@@ -2334,6 +2348,9 @@ async function addUsuario(){
     msg.textContent='Preencha nome, usuário e senha.';
     return;
   }
+  const eu=validarUsuarioLogin(usuario);
+  if(eu){ msg.style.color='#ef4444'; msg.textContent=eu; return; }
+  if(senha.length<6){ msg.style.color='#ef4444'; msg.textContent='A senha deve ter pelo menos 6 caracteres.'; return; }
   const r=await api('/api/usuarios','POST',{nome,usuario,senha,papel});
   if(r.ok){
     msg.style.color='#10b981';
@@ -2355,6 +2372,11 @@ async function delUsuario(usuario){
 }
 
 document.getElementById('modal-acesso').addEventListener('click',function(e){if(e.target===this)fecharModalAcesso();});
+
+document.getElementById('p-nome').addEventListener('input',function(){
+  const sug=sugerirUsuario(this.value);
+  document.getElementById('p-usuario').placeholder='Usuário de acesso (opcional, sem espaços nem acentos)'+(sug?' — sugestão: '+sug:'');
+});
 
 renderDatasConteudo();
 refresh();
