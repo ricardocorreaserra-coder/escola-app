@@ -186,6 +186,17 @@ def sanitize_long(text, max_len=2000):
 PAPEIS = ("admin", "secretaria", "professor")
 USUARIO_RE = re.compile(r"^[A-Za-z0-9._-]{3,30}$")
 
+def _erro_login(d, usuario, senha):
+    """Valida usuário/senha de um novo acesso. Retorna a mensagem de erro ou None."""
+    if not USUARIO_RE.match(usuario):
+        return ("Usuário inválido: use de 3 a 30 caracteres, só letras sem acento, números, "
+                "ponto, hífen ou sublinhado. Não use espaços. Exemplo: ricardo.serra.")
+    if any(u.lower() == usuario.lower() for u in d["usuarios"]):
+        return "Esse usuário já existe. Escolha outro."
+    if len(senha) < 6:
+        return "A senha deve ter pelo menos 6 caracteres."
+    return None
+
 def papel_do_usuario(ud):
     # contas antigas (só existia o admin) não têm "papel": são administradores
     return (ud or {}).get("papel") or "admin"
@@ -242,12 +253,15 @@ def login():
             register_login_failure(ip)
         else:
             d = load()
-            user_data = d.get("usuarios", {}).get(usuario)
+            usuarios = d.get("usuarios", {})
+            chave = usuario if usuario in usuarios else next(
+                (k for k in usuarios if k.lower() == usuario.lower()), None)
+            user_data = usuarios.get(chave) if chave else None
             if user_data and check_password_hash(user_data["senha_hash"], senha):
                 session.clear()
                 session["logado"] = True
-                session["usuario"] = usuario
-                session["nome"] = user_data.get("nome", usuario)
+                session["usuario"] = chave  # sempre a chave real, não o que foi digitado
+                session["nome"] = user_data.get("nome", chave)
                 reset_login_attempts(ip)
                 return redirect(url_for("index"))
             else:
@@ -497,14 +511,28 @@ def del_curso(nome):
 @papel_required("admin", "secretaria")
 def add_professor():
     d = load()
-    nome = sanitize(request.json.get("nome", ""))
+    body = request.json or {}
+    nome = sanitize(body.get("nome", ""))
+    usuario = str(body.get("usuario") or "").strip()
+    senha = str(body.get("senha") or "")
     if not nome:
         return jsonify({"erro": "Nome do professor é obrigatório."}), 400
     if nome in d["professores"]:
         return jsonify({"erro": "Professor já cadastrado."}), 400
+    criar_login = bool(usuario or senha)
+    if criar_login:
+        # Tudo é validado antes de gravar: se o acesso for inválido, o professor também não é criado.
+        if not usuario or not senha:
+            return jsonify({"erro": "Para criar o acesso, informe usuário e senha (ou deixe os dois em branco)."}), 400
+        erro = _erro_login(d, usuario, senha)
+        if erro:
+            return jsonify({"erro": erro}), 400
     d["professores"][nome] = {}
+    if criar_login:
+        d["usuarios"][usuario] = {"usuario": usuario, "nome": nome, "papel": "professor",
+                                  "professor": nome, "senha_hash": generate_password_hash(senha)}
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "acesso_criado": criar_login})
 
 @app.route("/api/professores/<nome>", methods=["DELETE"])
 @papel_required("admin", "secretaria")
@@ -797,12 +825,9 @@ def criar_usuario():
         return jsonify({"erro": "Perfil inválido."}), 400
     if papel_atual == "secretaria" and papel != "professor":
         return jsonify({"erro": "Secretárias só podem criar acessos de professores."}), 403
-    if not USUARIO_RE.match(usuario):
-        return jsonify({"erro": "Usuário deve ter de 3 a 30 caracteres: letras, números, ponto, hífen ou sublinhado."}), 400
-    if any(u.lower() == usuario.lower() for u in d["usuarios"]):
-        return jsonify({"erro": "Esse usuário já existe."}), 400
-    if len(senha) < 6:
-        return jsonify({"erro": "A senha deve ter pelo menos 6 caracteres."}), 400
+    erro = _erro_login(d, usuario, senha)
+    if erro:
+        return jsonify({"erro": erro}), 400
     prof_nome = ""
     if papel == "professor":
         prof_nome = sanitize(body.get("professor", ""))
