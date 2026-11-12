@@ -837,7 +837,7 @@ tr.group-row td {
           </select>
         </div>
         <div class="form-group small">
-          <input type="date" id="ch-data">
+          <input type="date" id="ch-data" onchange="loadChamada()">
         </div>
         <button class="btn btn-primary" onclick="salvarChamada()"><i class="ti ti-device-floppy"></i> Salvar</button>
       </div>
@@ -845,6 +845,7 @@ tr.group-row td {
     </div>
     <div class="card">
       <h3>Presença</h3>
+      <div id="ch-status" style="font-size:.9rem;margin-bottom:.75rem;color:#64748b"></div>
       <div id="ch-lista" style="color:#94a3b8">Selecione uma matéria para ver os alunos.</div>
     </div>
   </div>
@@ -1652,7 +1653,11 @@ async function desassoc(mat,materia){
 
 function loadChamada(){
   const mat=document.getElementById('ch-mat').value;
+  const data=document.getElementById('ch-data').value;
   const div=document.getElementById('ch-lista');
+  const status=document.getElementById('ch-status');
+  document.getElementById('ch-msg').textContent='';
+  status.textContent='';
   if(!mat){
     div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para ver os alunos.</div>';
     return;
@@ -1662,18 +1667,34 @@ function loadChamada(){
     div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
     return;
   }
+  const chamadas=((dados.materias[mat]||{}).chamadas)||{};
+  let registrados=0;
   let html='';
   agruparPorTurma(alunos,
     (label)=>{ html+=`<div class="group-header">${label}</div>`; },
     (m,a)=>{
+      const salvo=data?(chamadas[m]||{})[data]:undefined;
+      if(salvo!==undefined) registrados++;
+      const marcado=salvo===undefined?true:!!salvo;
       html+=`
     <div class="check-row">
-      <input type="checkbox" id="ch-${m}" checked>
+      <input type="checkbox" id="ch-${m}" ${marcado?'checked':''}>
       <label for="ch-${m}">${a.nome}</label>
     </div>`;
     }
   );
   div.innerHTML=html;
+  if(!data) return;
+  if(registrados===0){
+    status.textContent='Nenhuma chamada registrada em '+_fmtDataBR(data)+'. Todos começam como presentes.';
+  }else{
+    const sem=alunos.length-registrados;
+    status.textContent='Chamada já registrada em '+_fmtDataBR(data)+'. Ao salvar, ela será atualizada.'
+      +(sem>0?' ('+sem+' aluno(s) sem registro nesta data aparecem como presentes.)':'');
+    status.style.color='#0f766e';
+    return;
+  }
+  status.style.color='#64748b';
 }
 
 async function salvarChamada(){
@@ -1692,6 +1713,10 @@ async function salvarChamada(){
   });
   const r=await api('/api/chamada','POST',{materia:mat,data,presencas});
   if(r.ok){
+    const mdados=dados.materias[mat]||(dados.materias[mat]={});
+    const ch=mdados.chamadas||(mdados.chamadas={});
+    Object.entries(presencas).forEach(([m,p])=>{ (ch[m]||(ch[m]={}))[data]=p; });
+    loadChamada();
     msg.style.color='#10b981';
     msg.textContent='Chamada salva!';
   }else{
