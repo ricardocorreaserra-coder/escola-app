@@ -120,6 +120,24 @@ def init_db():
         conn.close()
     bootstrap_admin()
 
+def _turmas_da_materia(d, nome):
+    """Turmas que têm a matéria: por atribuição ou por alunos associados a ela."""
+    ts = {a.get("turma") for a in d.get("atribuicoes", []) if a.get("materia") == nome and a.get("turma")}
+    ts |= {a.get("turma") for a in d.get("alunos", {}).values()
+           if nome in a.get("materias", []) and a.get("turma")}
+    return {t for t in ts if t in d.get("turmas", {})}
+
+def _migrar_conteudos(d):
+    """Conteúdo lecionado agora é por turma: {turma: {data: texto}}.
+    O formato antigo era {data: texto} (compartilhado entre turmas). Cada turma que tem a matéria
+    recebe uma cópia, então o Diário de cada uma continua igual; sem turma, fica em "" (sem exibir).
+    É idempotente: só converte quando todos os valores são texto."""
+    for nome, m in d.get("materias", {}).items():
+        c = m.get("conteudos")
+        if isinstance(c, dict) and c and all(isinstance(v, str) for v in c.values()):
+            ts = _turmas_da_materia(d, nome)
+            m["conteudos"] = {t: dict(c) for t in sorted(ts)} if ts else {"": dict(c)}
+
 def _load_db():
     conn = get_conn()
     c = conn.cursor()
@@ -145,6 +163,7 @@ def _load_db():
             d["cursos"] = {}
         if "atribuicoes" not in d:
             d["atribuicoes"] = []
+        _migrar_conteudos(d)
         return d
     finally:
         c.close()
@@ -321,6 +340,7 @@ def _dados_do_professor(d, ud, eu):
             **m,
             "chamadas": {k: v for k, v in m.get("chamadas", {}).items() if k in alunos},
             "notas": {k: v for k, v in m.get("notas", {}).items() if k in alunos},
+            "conteudos": {t: v for t, v in (m.get("conteudos") or {}).items() if (t, nome) in pares},
         }
     return {"alunos": alunos, "turmas": {t: {} for t in turmas}, "materias": materias,
             "cursos": {}, "professores": {prof: {}} if prof else {}, "atribuicoes": atribs,
@@ -672,6 +692,24 @@ def _checar_professor_materia(d, nome):
 
 MAX_DATAS_CONTEUDO = 62
 
+def _resolver_turma_conteudo(d, nome, turma_informada):
+    """Turma do conteúdo lecionado. Sem turma informada, só aceita se houver uma única possível.
+    Retorna (turma, None) ou (None, resposta_de_erro)."""
+    ud = _usuario_atual(d)
+    eh_prof = papel_do_usuario(ud) == "professor"
+    permitidas = turmas_permitidas(d, ud, nome) if eh_prof else None
+    turma = sanitize(turma_informada or "")
+    if not turma:
+        candidatas = permitidas if eh_prof else _turmas_da_materia(d, nome)
+        if len(candidatas) != 1:
+            return None, (jsonify({"erro": "Informe a turma."}), 400)
+        turma = next(iter(candidatas))
+    if turma not in d["turmas"]:
+        return None, (jsonify({"erro": "Turma não encontrada."}), 404)
+    if eh_prof and turma not in permitidas:
+        return None, (jsonify({"erro": "Você não leciona esta matéria nesta turma."}), 403)
+    return turma, None
+
 @app.route("/api/materias/<nome>/conteudo", methods=["POST"])
 @papel_required("admin", "professor")
 def add_conteudo(nome):
@@ -683,6 +721,9 @@ def add_conteudo(nome):
     if negado:
         return negado
     body = request.json or {}
+    turma, erro = _resolver_turma_conteudo(d, nome, body.get("turma", ""))
+    if erro:
+        return erro
     # aceita "datas" (lista) ou "data" (uma só, formato antigo)
     entrada = body.get("datas")
     if entrada is None:
@@ -709,37 +750,11 @@ def add_conteudo(nome):
     if not conteudo:
         return jsonify({"erro": "Descreva o conteúdo lecionado."}), 400
 
-    mat = d["materias"][nome]
-    origem = None
-    if body.get("copiar_chamada") is True and len(datas) > 1:
-        # Copia a chamada da primeira data (a mais antiga) que já tiver chamada registrada.
-        # O professor só copia a chamada dos alunos das turmas que leciona nessa matéria.
-        ud = _usuario_atual(d)
-        permitidas = turmas_permitidas(d, ud, nome) if papel_do_usuario(ud) == "professor" else None
-
-        def aluno_ok(m):
-            a = d["alunos"].get(m)
-            if a is None:
-                return False
-            return permitidas is None or (a.get("turma", "") in permitidas and nome in a.get("materias", []))
-
-        chamadas = mat.setdefault("chamadas", {})
-        for dt in datas:
-            if any(dt in reg for m, reg in chamadas.items() if aluno_ok(m)):
-                origem = dt
-                break
-        if origem is None:
-            return jsonify({"erro": "Nenhuma das datas selecionadas tem chamada registrada. Registre a chamada de uma delas na aba Chamada."}), 400
-        for m, reg in chamadas.items():
-            if origem in reg and aluno_ok(m):
-                for dt in datas:
-                    reg[dt] = bool(reg[origem])
-
-    conteudos = mat.setdefault("conteudos", {})
+    por_turma = d["materias"][nome].setdefault("conteudos", {}).setdefault(turma, {})
     for dt in datas:
-        conteudos[dt] = conteudo
+        por_turma[dt] = conteudo
     save(d)
-    return jsonify({"ok": True, "datas": len(datas), "chamada_origem": origem})
+    return jsonify({"ok": True, "datas": len(datas), "turma": turma})
 
 @app.route("/api/materias/<nome>/conteudo/<data>", methods=["DELETE"])
 @papel_required("admin", "professor")
@@ -747,11 +762,15 @@ def del_conteudo(nome, data):
     d = load()
     nome = sanitize(nome)
     data = sanitize(data)
-    if nome in d["materias"]:
-        negado = _checar_professor_materia(d, nome)
-        if negado:
-            return negado
-        d["materias"][nome].setdefault("conteudos", {}).pop(data, None)
+    if nome not in d["materias"]:
+        return jsonify({"erro": "Matéria não encontrada."}), 404
+    negado = _checar_professor_materia(d, nome)
+    if negado:
+        return negado
+    turma, erro = _resolver_turma_conteudo(d, nome, request.args.get("turma", ""))
+    if erro:
+        return erro
+    ((d["materias"][nome].get("conteudos") or {}).get(turma) or {}).pop(data, None)
     save(d)
     return jsonify({"ok": True})
 
@@ -961,6 +980,8 @@ def del_turma(nome):
         return jsonify({"erro": "Turma não encontrada."}), 404
     del d["turmas"][nome]
     d["atribuicoes"] = [a for a in d.get("atribuicoes", []) if a.get("turma") != nome]
+    for m in d["materias"].values():
+        (m.get("conteudos") or {}).pop(nome, None)
     for aluno in d["alunos"].values():
         if aluno.get("turma") == nome:
             aluno["turma"] = ""
@@ -1295,7 +1316,7 @@ def gerar_diario():
         curso = mat_dados.get("curso", "")
     chamadas = mat_dados.get("chamadas", {})
     notas = mat_dados.get("notas", {})
-    conteudos = mat_dados.get("conteudos", {})
+    conteudos = (mat_dados.get("conteudos") or {}).get(turma, {})
     ids_turma = {mat for mat, _ in alunos}
     datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
@@ -1345,7 +1366,7 @@ def gerar_diario_pdf_rota():
         curso = mat_dados.get("curso", "")
     chamadas = mat_dados.get("chamadas", {})
     notas = mat_dados.get("notas", {})
-    conteudos = mat_dados.get("conteudos", {})
+    conteudos = (mat_dados.get("conteudos") or {}).get(turma, {})
     ids_turma = {mat for mat, _ in alunos}
     datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
