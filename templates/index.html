@@ -818,10 +818,6 @@ tr.group-row td {
           <textarea id="cl-texto" placeholder="O que foi ensinado nesta aula..."></textarea>
         </div>
       </div>
-      <div class="check-row" style="padding:6px 0; border-bottom:none">
-        <input type="checkbox" id="cl-copiar-chamada">
-        <label for="cl-copiar-chamada">Usar a mesma chamada em todas as datas (copia a chamada da primeira data que já tiver chamada registrada)</label>
-      </div>
       <button class="btn btn-primary" onclick="salvarConteudo()"><i class="ti ti-plus"></i> Salvar</button>
       <div class="msg" id="cl-msg"></div>
       <div id="cl-lista" style="margin-top:16px"></div>
@@ -1612,25 +1608,11 @@ async function salvarConteudo(){
     return;
   }
   const matDados=dados.materias[materia]||{};
-  const copiar=document.getElementById('cl-copiar-chamada').checked&&datas.length>1;
-  const avisos=[];
   const jaTem=datas.filter(d=>(matDados.conteudos||{})[d]);
-  if(jaTem.length) avisos.push(`${jaTem.length} data(s) já têm conteúdo lecionado e serão substituídas.`);
-  if(copiar){
-    const comChamada=new Set(Object.values(matDados.chamadas||{}).flatMap(r=>Object.keys(r)));
-    const origem=datas.find(d=>comChamada.has(d));
-    if(!origem){
-      _msgConteudo('Nenhuma das datas selecionadas tem chamada registrada. Registre a chamada de uma delas na aba Chamada.','#ef4444');
-      return;
-    }
-    const outras=datas.filter(d=>d!==origem&&comChamada.has(d));
-    if(outras.length) avisos.push(`${outras.length} data(s) já têm chamada registrada e serão substituídas pela chamada de ${_fmtDataBR(origem)}.`);
-  }
-  if(avisos.length&&!confirm(avisos.join('\n')+'\n\nContinuar?')) return;
-  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{datas,conteudo:texto,copiar_chamada:copiar});
+  if(jaTem.length&&!confirm(`${jaTem.length} data(s) já têm conteúdo lecionado e serão substituídas.\n\nContinuar?`)) return;
+  const r=await api('/api/materias/'+encodeURIComponent(materia)+'/conteudo','POST',{datas,conteudo:texto});
   if(r.ok){
-    let t=r.datas>1?`Conteúdo salvo em ${r.datas} datas!`:'Conteúdo salvo com sucesso!';
-    if(r.chamada_origem) t+=` A chamada de ${_fmtDataBR(r.chamada_origem)} foi copiada para as demais datas.`;
+    const t=r.datas>1?`Conteúdo salvo em ${r.datas} datas!`:'Conteúdo salvo com sucesso!';
     _msgConteudo(t,'#10b981');
     document.getElementById('cl-texto').value='';
     clDatas=[];
