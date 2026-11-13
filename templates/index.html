@@ -471,6 +471,9 @@ tr.group-row td {
   justify-content: flex-end;
   gap: 8px;
 }
+.ch-chip{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;padding:.25rem .7rem;font-size:.85rem;cursor:pointer;font-family:inherit;line-height:1.3}
+.ch-chip:hover{background:#f1f5f9}
+.ch-chip.ativa{background:#0f766e;border-color:#0f766e;color:#fff}
 </style>
 </head>
 <body>
@@ -842,6 +845,7 @@ tr.group-row td {
         <button class="btn btn-primary" onclick="salvarChamada()"><i class="ti ti-device-floppy"></i> Salvar</button>
       </div>
       <div class="msg" id="ch-msg"></div>
+      <div id="ch-datas" style="margin-top:.75rem"></div>
     </div>
     <div class="card">
       <h3>Presença</h3>
@@ -1651,6 +1655,28 @@ async function desassoc(mat,materia){
   refresh();
 }
 
+function abrirDataChamada(data){
+  document.getElementById('ch-data').value=data;
+  loadChamada();
+}
+
+function renderChamadaDatas(mat,dataAtual){
+  const box=document.getElementById('ch-datas');
+  if(!mat){ box.innerHTML=''; return; }
+  const chamadas=((dados.materias[mat]||{}).chamadas)||{};
+  const conj=new Set();
+  Object.values(chamadas).forEach(reg=>Object.keys(reg||{}).forEach(dt=>conj.add(dt)));
+  const lista=[...conj].sort().reverse();
+  if(!lista.length){
+    box.innerHTML='<div style="font-size:.85rem;color:#64748b">Nenhuma chamada registrada nesta matéria ainda.</div>';
+    return;
+  }
+  box.innerHTML='<div style="font-size:.85rem;color:#64748b;margin-bottom:.4rem">Chamadas já registradas nesta matéria ('+lista.length+'). Clique numa data para abri-la:</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:.4rem;max-height:7.5rem;overflow-y:auto">'
+    +lista.map(dt=>`<button type="button" class="ch-chip${dt===dataAtual?' ativa':''}" data-d="${dt}" onclick="abrirDataChamada(this.dataset.d)">${_fmtDataBR(dt)}</button>`).join('')
+    +'</div>';
+}
+
 function loadChamada(){
   const mat=document.getElementById('ch-mat').value;
   const data=document.getElementById('ch-data').value;
@@ -1658,6 +1684,7 @@ function loadChamada(){
   const status=document.getElementById('ch-status');
   document.getElementById('ch-msg').textContent='';
   status.textContent='';
+  renderChamadaDatas(mat,data);
   if(!mat){
     div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para ver os alunos.</div>';
     return;
