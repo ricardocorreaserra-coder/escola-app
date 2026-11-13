@@ -999,12 +999,31 @@ def salvar_chamada():
     ud = _usuario_atual(d)
     body = request.json or {}
     materia = sanitize(body.get("materia", ""))
-    data = sanitize(body.get("data", ""))
     presencas = body.get("presencas", {})
     if materia not in d["materias"]:
         return jsonify({"erro": "Matéria não encontrada."}), 404
-    if not data or not isinstance(presencas, dict):
+    # aceita "datas" (lista) ou "data" (uma só, formato antigo)
+    entrada = body.get("datas")
+    if entrada is None:
+        entrada = [body.get("data", "")]
+    if not isinstance(entrada, list) or not isinstance(presencas, dict):
         return jsonify({"erro": "Dados inválidos."}), 400
+    datas = []
+    for x in entrada:
+        x = sanitize(x)
+        if not x:
+            continue
+        try:
+            datetime.datetime.strptime(x, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"erro": f"Data inválida: {html.unescape(x)}."}), 400
+        if x not in datas:
+            datas.append(x)
+    datas.sort()
+    if not datas:
+        return jsonify({"erro": "Informe a data da chamada."}), 400
+    if len(datas) > MAX_DATAS_CONTEUDO:
+        return jsonify({"erro": f"Selecione no máximo {MAX_DATAS_CONTEUDO} datas por vez."}), 400
     permitidas = None
     if papel_do_usuario(ud) == "professor":
         permitidas = turmas_permitidas(d, ud, materia)
@@ -1019,9 +1038,10 @@ def salvar_chamada():
         if permitidas is not None and (aluno.get("turma", "") not in permitidas
                                        or materia not in aluno.get("materias", [])):
             continue
-        chamadas.setdefault(mat, {})[data] = bool(presente)
+        for data in datas:
+            chamadas.setdefault(mat, {})[data] = bool(presente)
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "datas": datas})
 
 @app.route("/api/notas", methods=["POST"])
 @papel_required("admin", "professor")
