@@ -835,15 +835,32 @@ tr.group-row td {
       <h3>Registrar chamada</h3>
       <div class="form-row">
         <div class="form-group">
-          <select id="ch-mat" onchange="loadChamada()">
+          <select id="ch-mat" onchange="trocarMateriaChamada()">
             <option value="">Selecione a matéria</option>
           </select>
         </div>
         <div class="form-group small">
-          <input type="date" id="ch-data" onchange="loadChamada()">
+          <input type="date" id="ch-data" onchange="loadChamada();renderDatasChamada()">
         </div>
         <button class="btn btn-primary" onclick="salvarChamada()"><i class="ti ti-device-floppy"></i> Salvar</button>
       </div>
+      <div style="margin-top:.9rem;font-size:.85rem;color:#64748b">Aplicar a mesma chamada a outras datas (opcional):</div>
+      <div class="form-row" style="margin-top:.25rem">
+        <div class="form-group small">
+          <label style="font-size:.8rem;color:#64748b">Outra data</label>
+          <input type="date" id="ch-extra-data">
+        </div>
+        <div class="form-group small">
+          <label style="font-size:.8rem;color:#64748b">Até (opcional)</label>
+          <input type="date" id="ch-data-fim">
+        </div>
+        <button class="btn btn-blue" onclick="adicionarDatasChamada()"><i class="ti ti-calendar-plus"></i> Adicionar data</button>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="ch-pular-fds" checked>
+        <label for="ch-pular-fds">Ignorar sábados e domingos (vale quando preencher “Até”)</label>
+      </div>
+      <div id="ch-extras" style="margin:6px 0 4px"></div>
       <div class="msg" id="ch-msg"></div>
       <div id="ch-datas" style="margin-top:.75rem"></div>
     </div>
@@ -1724,6 +1741,78 @@ function loadChamada(){
   status.style.color='#64748b';
 }
 
+let chExtras=[];
+
+function trocarMateriaChamada(){
+  chExtras=[];
+  loadChamada();
+  renderDatasChamada();
+}
+
+function adicionarDatasChamada(){
+  const msg=document.getElementById('ch-msg');
+  const ini=document.getElementById('ch-extra-data').value;
+  const fim=document.getElementById('ch-data-fim').value;
+  const pular=document.getElementById('ch-pular-fds').checked;
+  const erro=(t)=>{ msg.style.color='#ef4444'; msg.textContent=t; };
+  if(!ini){ erro('Escolha a data em “Outra data”.'); return; }
+  let novas=[];
+  if(fim){
+    if(fim<ini){ erro('A data final não pode ser anterior à inicial.'); return; }
+    const [y,m,d]=ini.split('-').map(Number);
+    const [y2,m2,d2]=fim.split('-').map(Number);
+    const tf=Date.UTC(y2,m2-1,d2);
+    for(let t=Date.UTC(y,m-1,d); t<=tf && novas.length<=62; t+=86400000){
+      const dow=new Date(t).getUTCDay();
+      if(pular&&(dow===0||dow===6)) continue;
+      novas.push(_isoDia(t));
+    }
+    if(!novas.length){ erro('Nenhum dia útil nesse período.'); return; }
+  }else{
+    novas=[ini];
+  }
+  const uniao=[...new Set([...chExtras,...novas])].sort();
+  if(uniao.length>62){ erro('Máximo de 62 datas por vez.'); return; }
+  chExtras=uniao;
+  document.getElementById('ch-extra-data').value='';
+  document.getElementById('ch-data-fim').value='';
+  msg.textContent='';
+  renderDatasChamada();
+}
+
+function removerDataChamada(iso){
+  chExtras=chExtras.filter(x=>x!==iso);
+  renderDatasChamada();
+}
+
+function limparDatasChamada(){
+  chExtras=[];
+  renderDatasChamada();
+}
+
+// datas onde a chamada será gravada: a data principal + as datas extras
+function _datasDaChamada(){
+  const principal=document.getElementById('ch-data').value;
+  const todas=[...new Set([...(principal?[principal]:[]),...chExtras])].sort();
+  if(todas.length>62) return {datas:[],erro:'Máximo de 62 datas por vez.'};
+  return {datas:todas,erro:''};
+}
+
+function renderDatasChamada(){
+  const div=document.getElementById('ch-extras');
+  if(!div) return;
+  if(!chExtras.length){ div.innerHTML=''; return; }
+  const principal=document.getElementById('ch-data').value;
+  const total=_datasDaChamada();
+  div.innerHTML=chExtras.map(d=>`<span class="badge" style="display:inline-flex; align-items:center; gap:4px">${_fmtDataBR(d)}<button class="btn-icon" title="Remover" style="padding:0 2px; font-size:14px; color:#64748b" data-d="${d}" onclick="removerDataChamada(this.dataset.d)">×</button></span>`).join('')
+    +`<button class="btn-icon" style="font-size:12px; color:#2563eb" onclick="limparDatasChamada()">limpar todas</button>`
+    +`<div style="font-size:12px; color:${total.erro?'#ef4444':'#64748b'}; margin-top:6px">${total.erro
+        ? total.erro
+        : (principal
+            ? 'Esta chamada será salva em '+total.datas.length+' data(s): a “Data” de cima + '+chExtras.filter(x=>x!==principal).length+' extra(s).'
+            : 'Escolha também a “Data” de cima, que é a chamada exibida na lista.')}</div>`;
+}
+
 async function salvarChamada(){
   const mat=document.getElementById('ch-mat').value;
   const data=document.getElementById('ch-data').value;
@@ -1733,19 +1822,41 @@ async function salvarChamada(){
     msg.textContent='Selecione matéria e data.';
     return;
   }
+  const per=_datasDaChamada();
+  if(per.erro){
+    msg.style.color='#ef4444';
+    msg.textContent=per.erro;
+    return;
+  }
+  const datas=per.datas;
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   const presencas={};
   alunos.forEach(([m])=>{
     presencas[m]=document.getElementById('ch-'+m)?.checked||false;
   });
-  const r=await api('/api/chamada','POST',{materia:mat,data,presencas});
+  if(datas.length>1){
+    const chExist=((dados.materias[mat]||{}).chamadas)||{};
+    const jaTem=datas.filter(dt=>alunos.some(([m])=>(chExist[m]||{})[dt]!==undefined)).length;
+    const lista=datas.slice(0,10).map(_fmtDataBR).join(', ')+(datas.length>10?' …':'');
+    let pergunta='Salvar esta chamada em '+datas.length+' datas?\n\n'+lista;
+    if(jaTem===1) pergunta+='\n\n1 dessas datas já tem chamada registrada, que será substituída.';
+    else if(jaTem>1) pergunta+='\n\n'+jaTem+' dessas datas já têm chamada registrada, que serão substituídas.';
+    if(!confirm(pergunta)) return;
+  }
+  const r=await api('/api/chamada','POST',{materia:mat,datas,presencas});
   if(r.ok){
     const mdados=dados.materias[mat]||(dados.materias[mat]={});
     const ch=mdados.chamadas||(mdados.chamadas={});
-    Object.entries(presencas).forEach(([m,p])=>{ (ch[m]||(ch[m]={}))[data]=p; });
+    Object.entries(presencas).forEach(([m,p])=>{
+      datas.forEach(dt=>{ (ch[m]||(ch[m]={}))[dt]=p; });
+    });
+    chExtras=[];
+    renderDatasChamada();
     loadChamada();
     msg.style.color='#10b981';
-    msg.textContent='Chamada salva!';
+    msg.textContent=datas.length>1
+      ?'Chamada salva em '+datas.length+' datas!'
+      :'Chamada salva!';
   }else{
     msg.style.color='#ef4444';
     msg.textContent=r.erro;
