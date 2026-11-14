@@ -391,6 +391,19 @@ tr.group-row td {
 .media-badge.none {
   background-color: #94a3b8; /* Slate-400 */
 }
+.media-badge.recuperacao {
+  background-color: #f59e0b; /* Amber-500 */
+}
+.nota-grid-input:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+.regra-notas {
+  font-size: .85rem;
+  color: #64748b;
+  margin-bottom: .75rem;
+}
 .table-footer {
   display: flex;
   justify-content: flex-end;
@@ -1023,6 +1036,18 @@ tr.group-row td {
       </p>
       <button class="btn btn-primary" onclick="baixarBackup()"><i class="ti ti-download"></i> Baixar backup (.json)</button>
     </div>
+    <div class="card" id="cv-notas-card" style="display:none">
+      <h3>Converter notas antigas (0–10 → 0–100)</h3>
+      <p id="cv-notas-texto" style="font-size:13px; color:#334155; margin-bottom:14px"></p>
+      <p style="font-size:13px; color:#ef4444; margin-bottom:14px">
+        <strong>Faça isso uma única vez</strong> e, antes, baixe um backup (cartão acima). A conversão multiplica cada nota por 10.
+      </p>
+      <div class="form-row">
+        <button class="btn btn-primary" onclick="converterNotas('converter')"><i class="ti ti-arrows-exchange"></i> Converter notas (×10)</button>
+        <button class="btn btn-blue" onclick="converterNotas('dispensar')">Manter como estão</button>
+      </div>
+      <div class="msg" id="cv-notas-msg"></div>
+    </div>
     <div class="card">
       <h3>Restaurar backup</h3>
       <p style="font-size:13px; color:#ef4444; margin-bottom:14px">
@@ -1106,6 +1131,7 @@ async function refresh(){
   populateSelects();
   renderConteudos();
   renderLogoPreview();
+  renderConversaoNotas();
 }
 
 function showTab(id,el){
@@ -1119,9 +1145,47 @@ function showTab(id,el){
   if(id==='usuarios') loadUsuarios();
 }
 
-function calcMedia(notas){
-  const vals=Object.values(notas).map(Number).filter(v=>!isNaN(v));
-  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+// Regra de notas da escola (os valores vêm do servidor em dados.regras_notas; estes são só o padrão)
+const REGRAS_PADRAO={nota_maxima:100,media_aprovacao:60,recuperacao:'Recuperação'};
+function regrasNotas(){
+  return Object.assign({},REGRAS_PADRAO,(typeof dados!=='undefined'&&dados&&dados.regras_notas)||{});
+}
+function ehRecuperacao(nome){
+  const t=String(nome).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  return t==='recuperacao'||t==='rec';
+}
+function _arred2(x){ return Number(x.toFixed(2)); }   // meio para cima, igual ao servidor
+
+// Média abaixo da mínima leva à recuperação; na recuperação a média é só a nota dela.
+function situacaoNotas(notasAluno){
+  const R=regrasNotas();
+  const regulares=[];
+  let rec=null;
+  Object.entries(notasAluno||{}).forEach(([av,v])=>{
+    if(v===null||v===''||v===undefined) return;
+    const n=Number(v);
+    if(isNaN(n)) return;
+    if(ehRecuperacao(av)){ if(rec===null) rec=n; }
+    else regulares.push(n);
+  });
+  if(!regulares.length) return {media:null,mediaAvaliacoes:null,recuperacao:rec,porRecuperacao:false,situacao:'sem_notas'};
+  const mediaAv=_arred2(regulares.reduce((a,b)=>a+b,0)/regulares.length);
+  if(mediaAv>=R.media_aprovacao) return {media:mediaAv,mediaAvaliacoes:mediaAv,recuperacao:rec,porRecuperacao:false,situacao:'aprovado'};
+  if(rec===null) return {media:mediaAv,mediaAvaliacoes:mediaAv,recuperacao:null,porRecuperacao:false,situacao:'recuperacao'};
+  const r2=_arred2(rec);
+  return {media:r2,mediaAvaliacoes:mediaAv,recuperacao:r2,porRecuperacao:true,situacao:r2>=R.media_aprovacao?'aprovado':'reprovado'};
+}
+
+function rotuloSituacao(sit){
+  if(sit.situacao==='sem_notas') return {classe:'none',texto:'Sem notas'};
+  if(sit.situacao==='recuperacao') return {classe:'recuperacao',texto:'Em recuperação'};
+  if(sit.situacao==='aprovado') return {classe:'aprovado',texto:sit.porRecuperacao?'Aprovado na recuperação':'Aprovado'};
+  return {classe:'reprovado',texto:'Reprovado'};
+}
+
+function textoRegraNotas(){
+  const R=regrasNotas();
+  return `Notas de 0 a ${R.nota_maxima}. Média mínima para aprovação: ${R.media_aprovacao}. Abaixo disso o aluno vai para recuperação e, nela, a média passa a ser apenas a nota da recuperação.`;
 }
 
 function alunosOrdenados(){
@@ -1917,11 +1981,11 @@ function loadNotas(){
     return;
   }
 
-  // Coleta avaliações existentes
+  // Coleta avaliações existentes (a recuperação tem coluna própria, fora desta lista)
   const avalsSet=new Set();
   alunos.forEach(([m])=>{
     const notasAluno=dados.materias[mat]?.notas?.[m]||{};
-    Object.keys(notasAluno).forEach(av=>avalsSet.add(av));
+    Object.keys(notasAluno).forEach(av=>{ if(!ehRecuperacao(av)) avalsSet.add(av); });
   });
   
   currentEvaluations=[...avalsSet].sort();
@@ -1932,34 +1996,54 @@ function loadNotas(){
   renderNotasTable(alunos,mat);
 }
 
+function _celulaSituacao(sit){
+  const rot=rotuloSituacao(sit);
+  const extra=sit.porRecuperacao?' · '+sit.media.toFixed(2):'';
+  return `<span class="media-badge ${rot.classe}">${rot.texto}${extra}</span>`;
+}
+
 function renderNotasTable(alunos,mat){
   const div=document.getElementById('nt-lista');
+  const R=regrasNotas();
   
-  let html='<div class="table-container"><table class="stripe">';
+  let html='';
+  if(dados.conversao_notas?.pendente){
+    html+='<div class="regra-notas" style="color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px"><strong>Atenção:</strong> há notas antigas (escala 0–10) ainda não convertidas para 0–100. Abra a aba <strong>Backup</strong> e use “Converter notas antigas”.</div>';
+  }
+  html+=`<div class="regra-notas">${textoRegraNotas()}</div>`;
+  html+='<div class="table-container"><table class="stripe">';
   html+='<thead><tr><th>Aluno</th>';
   currentEvaluations.forEach(av=>{
     html+=`<th class="text-center">${av}</th>`;
   });
-  html+='<th class="text-center">Média</th></tr></thead><tbody>';
-  const colspanGrupo=currentEvaluations.length+2;
+  html+='<th class="text-center">Média</th><th class="text-center">Recuperação</th><th class="text-center">Situação</th></tr></thead><tbody>';
+  const colspanGrupo=currentEvaluations.length+4;
 
   agruparPorTurma(alunos,
     (label)=>{ html+=`<tr class="group-row"><td colspan="${colspanGrupo}">${label}</td></tr>`; },
     (m,a)=>{
       const notasAluno=dados.materias[mat]?.notas?.[m]||{};
+      const sit=situacaoNotas(notasAluno);
 
       html+=`<tr><td class="font-medium" style="color: #334155;">${a.nome}</td>`;
 
       currentEvaluations.forEach(av=>{
         const val=notasAluno[av]!==undefined?notasAluno[av]:'';
-        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="10" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
+        html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="${R.nota_maxima}" step="0.1" value="${val}" data-student="${m}" data-eval="${av}" oninput="recalcStudentAverage('${m}')"></td>`;
       });
 
-      const media=calcMedia(notasAluno);
-      const badgeClass=media===null?'none':(media>=6?'aprovado':'reprovado');
-      const mediaText=media!==null?media.toFixed(2):'—';
+      const mediaAv=sit.mediaAvaliacoes;
+      const badgeClass=mediaAv===null?'none':(mediaAv>=R.media_aprovacao?'aprovado':'recuperacao');
+      const mediaText=mediaAv!==null?mediaAv.toFixed(2):'—';
+      html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td>`;
 
-      html+=`<td class="text-center"><span class="media-badge ${badgeClass}" id="media-${m}">${mediaText}</span></td></tr>`;
+      // Recuperação: só é preenchida por quem ficou abaixo da média
+      const recVal=Object.entries(notasAluno).find(([k])=>ehRecuperacao(k));
+      const recTxt=recVal?recVal[1]:'';
+      const podeRec=mediaAv!==null&&mediaAv<R.media_aprovacao;
+      html+=`<td class="text-center"><input class="nota-grid-input" type="number" min="0" max="${R.nota_maxima}" step="0.1" value="${recTxt}" data-student="${m}" data-eval="${R.recuperacao}" oninput="recalcStudentAverage('${m}')" ${podeRec?'':'disabled'}></td>`;
+
+      html+=`<td class="text-center" id="sit-${m}">${_celulaSituacao(sit)}</td></tr>`;
     }
   );
   
@@ -1967,6 +2051,18 @@ function renderNotasTable(alunos,mat){
   html+=`<div class="table-footer" style="align-items:center; gap:14px"><span class="msg" id="nt-msg-rodape" style="margin:0"></span><button class="btn-save-notas" onclick="salvarNotas()">Salvar Notas</button></div>`;
   
   div.innerHTML=html;
+}
+
+// Lê os campos de um aluno na grade: {avaliação: valor digitado}
+function _notasDigitadas(matricula){
+  const out={};
+  document.querySelectorAll(`input[data-student="${matricula}"]`).forEach(input=>{
+    const val=input.value.trim();
+    if(val==='') return;
+    const n=parseFloat(val.replace(',','.'));
+    if(!isNaN(n)) out[input.dataset.eval]=n;
+  });
+  return out;
 }
 
 function addAvaliacao(){
@@ -1985,6 +2081,11 @@ function addAvaliacao(){
     msg.textContent='Digite o nome da avaliação.';
     return;
   }
+  if(ehRecuperacao(aval)){
+    msg.style.color='#ef4444';
+    msg.textContent='A recuperação já tem coluna própria na tabela.';
+    return;
+  }
   if(currentEvaluations.includes(aval)){
     msg.style.color='#ef4444';
     msg.textContent='Esta avaliação já existe.';
@@ -1997,53 +2098,41 @@ function addAvaliacao(){
   
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   
-  // Salva temporariamente na memória os valores digitados para não perdê-los no re-render
+  // Guarda na memória os valores digitados (inclusive a recuperação) para não perdê-los ao redesenhar
   alunos.forEach(([m])=>{
     if(!dados.materias[mat].notas) dados.materias[mat].notas={};
-    if(!dados.materias[mat].notas[m]) dados.materias[mat].notas[m]={};
-    
-    currentEvaluations.forEach(av=>{
-      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
-      if(input){
-        const val=input.value.trim();
-        if(val===''){
-          delete dados.materias[mat].notas[m][av];
-        }else{
-          dados.materias[mat].notas[m][av]=parseFloat(val.replace(',','.'));
-        }
-      }
-    });
+    dados.materias[mat].notas[m]=_notasDigitadas(m);
   });
   
   renderNotasTable(alunos,mat);
 }
 
 function recalcStudentAverage(matricula){
-  const inputs=document.querySelectorAll(`input[data-student="${matricula}"]`);
-  let sum=0;
-  let count=0;
-  inputs.forEach(input=>{
-    const val=parseFloat(input.value.replace(',','.'));
-    if(!isNaN(val)){
-      sum+=val;
-      count++;
-    }
-  });
-  
+  const R=regrasNotas();
+  const sit=situacaoNotas(_notasDigitadas(matricula));
+  const mediaAv=sit.mediaAvaliacoes;
+
   const mediaBadge=document.getElementById(`media-${matricula}`);
-  if(count>0){
-    const media=sum/count;
-    mediaBadge.textContent=media.toFixed(2);
-    mediaBadge.className='media-badge '+(media>=6?'aprovado':'reprovado');
+  if(mediaAv!==null){
+    mediaBadge.textContent=mediaAv.toFixed(2);
+    mediaBadge.className='media-badge '+(mediaAv>=R.media_aprovacao?'aprovado':'recuperacao');
   }else{
     mediaBadge.textContent='—';
     mediaBadge.className='media-badge none';
   }
+
+  // a recuperação só fica liberada para quem está abaixo da média
+  const recInput=document.querySelector(`input[data-student="${matricula}"][data-eval="${R.recuperacao}"]`);
+  if(recInput) recInput.disabled=!(mediaAv!==null&&mediaAv<R.media_aprovacao);
+
+  const celula=document.getElementById(`sit-${matricula}`);
+  if(celula) celula.innerHTML=_celulaSituacao(sit);
 }
 
 async function salvarNotas(){
   const mat=document.getElementById('nt-mat').value;
   const msg=document.getElementById('nt-msg');
+  const R=regrasNotas();
   
   if(!mat){
     msg.style.color='#ef4444';
@@ -2053,22 +2142,20 @@ async function salvarNotas(){
   
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   const notas={};
+  let foraDoLimite=0;
   
   alunos.forEach(([m])=>{
     notas[m]={};
-    currentEvaluations.forEach(av=>{
-      const input=document.querySelector(`input[data-student="${m}"][data-eval="${av}"]`);
-      if(input){
-        const val=input.value.trim();
-        if(val!==''){
-          const numVal=parseFloat(val.replace(',','.'));
-          if(!isNaN(numVal)&&numVal>=0&&numVal<=10){
-            notas[m][av]=numVal;
-          }
-        }
-      }
+    Object.entries(_notasDigitadas(m)).forEach(([av,numVal])=>{
+      if(numVal>=0&&numVal<=R.nota_maxima) notas[m][av]=numVal;
+      else foraDoLimite++;
     });
   });
+
+  if(foraDoLimite){
+    mostrarMsgNotas(`Há ${foraDoLimite} nota(s) fora do intervalo de 0 a ${R.nota_maxima}. Corrija e salve de novo.`,'#ef4444',0);
+    return;
+  }
   
   const r=await api('/api/notas','POST',{materia:mat,notas});
   if(r.ok){
@@ -2115,11 +2202,13 @@ function loadBoletim(){
   materias.forEach(nome=>{
     const matDados=dados.materias[nome];
     const notasAluno=matDados?.notas?.[mat]||{};
-    const avals=Object.keys(notasAluno).sort();
-    const media=calcMedia(notasAluno);
-    const ap=media!==null&&media>=6;
-    const badgeClass=media===null?'none':(ap?'aprovado':'reprovado');
-    const badgeText=media!==null?(ap?'Aprovado':'Reprovado')+' — Média: '+media.toFixed(2):'Sem notas';
+    const sit=situacaoNotas(notasAluno);
+    const rot=rotuloSituacao(sit);
+    const badgeClass=rot.classe;
+    const badgeText=sit.media!==null?rot.texto+' — Média: '+sit.media.toFixed(2):'Sem notas';
+    const avals=Object.keys(notasAluno).filter(av=>!ehRecuperacao(av)).sort();
+    const colsRec=sit.porRecuperacao?[regrasNotas().recuperacao]:[];
+    const valorDe=(av)=>ehRecuperacao(av)?sit.recuperacao:notasAluno[av];
     
     html+=`<div class="card boletim-card">`;
     html+=`<div class="boletim-card-header">`;
@@ -2127,11 +2216,17 @@ function loadBoletim(){
     html+=`<span class="media-badge ${badgeClass}">${badgeText}</span>`;
     html+='</div>';
     if(avals.length){
+      const colunas=[...avals,...colsRec];
       html+='<div class="table-container"><table class="stripe"><thead><tr>';
-      avals.forEach(av=>{html+=`<th class="text-center">${av}</th>`;});
+      colunas.forEach(av=>{html+=`<th class="text-center">${av}</th>`;});
       html+='</tr></thead><tbody><tr>';
-      avals.forEach(av=>{html+=`<td class="text-center font-medium">${notasAluno[av]}</td>`;});
+      colunas.forEach(av=>{html+=`<td class="text-center font-medium">${valorDe(av)}</td>`;});
       html+='</tr></tbody></table></div>';
+      if(sit.porRecuperacao){
+        html+=`<div class="regra-notas" style="margin:.5rem 0 0">Média das avaliações: ${sit.mediaAvaliacoes.toFixed(2)} (abaixo de ${regrasNotas().media_aprovacao}). Na recuperação, a média passa a ser a nota da recuperação.</div>`;
+      }else if(sit.situacao==='recuperacao'){
+        html+=`<div class="regra-notas" style="margin:.5rem 0 0">Média abaixo de ${regrasNotas().media_aprovacao}: aluno em recuperação. A média final será a nota da recuperação.</div>`;
+      }
     }else{
       html+='<div class="no-grades">Nenhuma nota lançada.</div>';
     }
@@ -2252,6 +2347,37 @@ async function removerLogo(){
   if(!confirm('Remover o logotipo do Diário?'))return;
   await api('/api/logo','DELETE');
   await refresh();
+}
+
+function renderConversaoNotas(){
+  const card=document.getElementById('cv-notas-card');
+  if(!card) return;
+  const c=dados.conversao_notas;
+  if(!c||!c.pendente){ card.style.display='none'; return; }
+  const fmt=(x)=>String(x).replace('.',',');
+  document.getElementById('cv-notas-texto').textContent=
+    `Foram encontradas ${c.total} nota(s) lançada(s), todas entre 0 e 10 (a maior é ${fmt(c.maximo)}). O sistema agora usa notas de 0 a ${regrasNotas().nota_maxima}, com média mínima ${regrasNotas().media_aprovacao}, então notas na escala antiga precisam ser convertidas: 8,5 vira 85, por exemplo. Sem a conversão, esses alunos aparecem em recuperação.`;
+  card.style.display='';
+}
+
+async function converterNotas(acao){
+  const msg=document.getElementById('cv-notas-msg');
+  const c=dados.conversao_notas||{};
+  const texto=acao==='converter'
+    ?`Converter ${c.total} nota(s) de 0–10 para 0–100 (multiplica por 10)?\n\nIsso só pode ser feito uma vez. Você já baixou um backup?`
+    :'Manter as notas como estão, sem converter?\n\nUse isto se as notas já estão em 0–100 ou se eram apenas testes. A opção de converter deixará de aparecer.';
+  if(!confirm(texto)) return;
+  const r=await api('/api/notas/converter-escala','POST',{acao});
+  if(r.ok){
+    await refresh();
+    msg.style.color='#10b981';
+    msg.textContent=acao==='converter'?`✓ ${r.convertidas} nota(s) convertida(s) para 0–${regrasNotas().nota_maxima}.`:'Conversão dispensada.';
+    document.getElementById('cv-notas-card').style.display='';
+    setTimeout(()=>{ document.getElementById('cv-notas-card').style.display='none'; msg.textContent=''; },6000);
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro||'Não foi possível converter.';
+  }
 }
 
 function baixarBackup(){
