@@ -8,7 +8,11 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.drawing.image import Image as XLImage
 from PIL import Image as PILImage
-from diario_pdf import gerar_diario_pdf, AULAS_POR_DIA
+from diario_pdf import (
+    gerar_diario_pdf, AULAS_POR_DIA,
+    NOTA_MAXIMA, MEDIA_APROVACAO, AVAL_RECUPERACAO,
+    eh_recuperacao, valor_da_avaliacao, avaliacoes_do_diario, rotulo_avaliacao, calcular_situacao,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave")
@@ -137,6 +141,9 @@ def _migrar_conteudos(d):
         if isinstance(c, dict) and c and all(isinstance(v, str) for v in c.values()):
             ts = _turmas_da_materia(d, nome)
             m["conteudos"] = {t: dict(c) for t in sorted(ts)} if ts else {"": dict(c)}
+
+REGRAS_NOTAS = {"nota_maxima": NOTA_MAXIMA, "media_aprovacao": MEDIA_APROVACAO,
+                "recuperacao": AVAL_RECUPERACAO}
 
 def _load_db():
     conn = get_conn()
@@ -313,11 +320,26 @@ def get_dados():
     out = {k: v for k, v in d.items() if k != "usuarios"}  # nunca expor hashes de senha
     out["eu"] = eu
     out["aulas_por_dia"] = AULAS_POR_DIA
+    out["regras_notas"] = REGRAS_NOTAS
     out["logins_professores"] = {u["professor"]: login for login, u in d["usuarios"].items()
                                  if u.get("papel") == "professor" and u.get("professor")}
     if papel != "admin":
         out.pop("config", None)  # logotipo só interessa ao admin
+    else:
+        out["conversao_notas"] = _situacao_conversao_notas(d)
     return jsonify(out)
+
+def _resumo_notas(d):
+    vals = [v for m in d["materias"].values() for reg in (m.get("notas") or {}).values()
+            for v in reg.values() if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    return {"total": len(vals), "maximo": max(vals) if vals else None}
+
+def _situacao_conversao_notas(d):
+    """A escala das notas passou de 0-10 para 0-100. Pendente = há notas, todas até 10 e nada resolvido ainda."""
+    r = _resumo_notas(d)
+    resolvida = bool(d.get("config", {}).get("escala_notas_resolvida"))
+    return {"pendente": (not resolvida) and r["total"] > 0 and r["maximo"] <= 10,
+            "total": r["total"], "maximo": r["maximo"]}
 
 def _dados_do_professor(d, ud, eu):
     """Só as turmas/matérias/alunos que o professor leciona."""
@@ -344,7 +366,8 @@ def _dados_do_professor(d, ud, eu):
         }
     return {"alunos": alunos, "turmas": {t: {} for t in turmas}, "materias": materias,
             "cursos": {}, "professores": {prof: {}} if prof else {}, "atribuicoes": atribs,
-            "eu": eu, "logins_professores": {}, "aulas_por_dia": AULAS_POR_DIA}
+            "eu": eu, "logins_professores": {}, "aulas_por_dia": AULAS_POR_DIA,
+            "regras_notas": REGRAS_NOTAS}
 
 @app.route("/api/alunos", methods=["POST"])
 @papel_required("admin", "secretaria")
@@ -1064,6 +1087,35 @@ def salvar_chamada():
     save(d)
     return jsonify({"ok": True, "datas": datas})
 
+@app.route("/api/notas/converter-escala", methods=["POST"])
+@papel_required("admin")
+def converter_escala_notas():
+    """Uso único: converte as notas antigas (0 a 10) para a escala atual (0 a 100), multiplicando por 10,
+    ou dispensa a conversão. Recusa converter se alguma nota passar de 10."""
+    d = load()
+    cfg = d.setdefault("config", {})
+    if cfg.get("escala_notas_resolvida"):
+        return jsonify({"erro": "Esta conversão já foi feita (ou dispensada) e não pode ser repetida."}), 400
+    acao = (request.json or {}).get("acao")
+    if acao not in ("converter", "dispensar"):
+        return jsonify({"erro": "Ação inválida."}), 400
+    convertidas = 0
+    if acao == "converter":
+        r = _resumo_notas(d)
+        if r["total"] == 0:
+            return jsonify({"erro": "Não há notas lançadas para converter."}), 400
+        if r["maximo"] > 10:
+            return jsonify({"erro": "Há notas acima de 10, que não parecem estar na escala de 0 a 10. Nada foi alterado."}), 400
+        for m in d["materias"].values():
+            for reg in (m.get("notas") or {}).values():
+                for av, v in list(reg.items()):
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        reg[av] = round(v * 10, 2)
+                        convertidas += 1
+    cfg["escala_notas_resolvida"] = acao
+    save(d)
+    return jsonify({"ok": True, "acao": acao, "convertidas": convertidas})
+
 @app.route("/api/notas", methods=["POST"])
 @papel_required("admin", "professor")
 def salvar_notas():
@@ -1098,11 +1150,13 @@ def salvar_notas():
             aval = sanitize(aval)
             if not aval:
                 continue
+            if eh_recuperacao(aval):
+                aval = AVAL_RECUPERACAO   # a recuperação tem sempre o mesmo nome
             if val is None or val == "":
                 continue
             try:
                 n = float(str(val).replace(",", "."))
-                if 0 <= n <= 10:
+                if 0 <= n <= NOTA_MAXIMA:
                     aluno_grades[aval] = n
             except (ValueError, TypeError):
                 pass
@@ -1190,7 +1244,7 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
         cell.font = bold
         cell.alignment = center
     for i, av in enumerate(avals):
-        cell = ws.cell(header_row, col_first_aval + i, av)
+        cell = ws.cell(header_row, col_first_aval + i, rotulo_avaliacao(av))
         cell.font = bold
         cell.alignment = center
     ws.cell(header_row, col_media, "Média").font = bold
@@ -1217,21 +1271,22 @@ def gerar_diario_workbook(instituicao, curso, materia, professor, turma, ano, al
                 val = ""
             ws.cell(row, col_first_data + i, val).alignment = center
         notas_aluno = notas.get(mat, {})
-        vals = []
         for i, av in enumerate(avals):
-            v = notas_aluno.get(av)
+            v = valor_da_avaliacao(notas_aluno, av)
             ws.cell(row, col_first_aval + i, v if v is not None else "").alignment = center
-            if isinstance(v, (int, float)):
-                vals.append(v)
-        media = round(sum(vals) / len(vals), 2) if vals else ""
-        ws.cell(row, col_media, media).alignment = center
+        media = calcular_situacao(notas_aluno)["media"]   # com recuperação, vale a nota dela
+        ws.cell(row, col_media, media if media is not None else "").alignment = center
         ws.cell(row, col_faltas, faltas).alignment = center
         for col in range(1, col_faltas + 1):
             ws.cell(row, col).border = border
         row += 1
 
     if n_datas:
-        nota = ws.cell(row + 1, 1, f"Legenda: P = presente   F = falta   |   cada dia de aula = {AULAS_POR_DIA} horas-aula (faltas em horas-aula)")
+        texto_leg = (f"Legenda: P = presente   F = falta   |   cada dia de aula = {AULAS_POR_DIA} horas-aula (faltas em horas-aula)"
+                     f"   |   média mínima para aprovação: {MEDIA_APROVACAO}")
+        if AVAL_RECUPERACAO in avals:
+            texto_leg += "   |   REC = recuperação (a média passa a ser a nota da recuperação)"
+        nota = ws.cell(row + 1, 1, texto_leg)
         nota.font = Font(italic=True, size=9, color="64748B")
 
     ws.column_dimensions[get_column_letter(COL_NUM)].width = 5
@@ -1320,7 +1375,7 @@ def gerar_diario():
     ids_turma = {mat for mat, _ in alunos}
     datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
-    avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
+    avals = avaliacoes_do_diario({k: v for k, v in notas.items() if k in ids_turma})  # só as notas desta turma
     ano = datetime.datetime.now().year
 
     logo_bytes = None
@@ -1370,7 +1425,7 @@ def gerar_diario_pdf_rota():
     ids_turma = {mat for mat, _ in alunos}
     datas_chamada = {data for k, reg in chamadas.items() if k in ids_turma for data in reg.keys()}
     datas = sorted(datas_chamada | set(conteudos.keys()))
-    avals = sorted({av for reg in notas.values() for av in reg.keys()})[:6]
+    avals = avaliacoes_do_diario({k: v for k, v in notas.items() if k in ids_turma})  # só as notas desta turma
     ano = datetime.datetime.now().year
 
     logo_bytes = None
