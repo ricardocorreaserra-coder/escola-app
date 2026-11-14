@@ -4,6 +4,8 @@ Recebe os mesmos dados que gerar_diario_workbook() usa para o .xlsx.
 """
 import datetime
 import html
+import unicodedata
+from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 
 from PIL import Image as PILImage
@@ -20,6 +22,89 @@ from xml.sax.saxutils import escape as _xml_escape
 
 # Cada dia de aula vale 4 horas-aula: vale para "Aulas dadas" e para as faltas.
 AULAS_POR_DIA = 4
+
+# --- Regra de notas da escola ------------------------------------------------
+# Notas de 0 a 100; a média mínima para aprovação é 60.
+# Média abaixo de 60 leva à recuperação; na recuperação a média passa a ser apenas a nota dela.
+NOTA_MAXIMA = 100
+MEDIA_APROVACAO = 60
+AVAL_RECUPERACAO = "Recuperação"   # nome reservado da avaliação de recuperação
+
+
+def _sem_acento(txt):
+    t = unicodedata.normalize("NFKD", html.unescape(str(txt)))
+    return "".join(c for c in t if not unicodedata.combining(c)).strip().lower()
+
+
+def eh_recuperacao(nome):
+    """True para a avaliação de recuperação (aceita 'recuperacao' e 'rec', com ou sem acento)."""
+    return _sem_acento(nome) in ("recuperacao", "rec")
+
+
+def _arred2(x):
+    """Arredonda para 2 casas (meio para cima). A tela faz igual, para mostrarem a mesma média."""
+    return float(Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _soma(valores):
+    """Soma simples, na ordem; igual à da tela (o sum() do Python usa outra técnica e pode divergir)."""
+    total = 0.0
+    for v in valores:
+        total += v
+    return total
+
+
+def _numeros(valores):
+    return [v for v in valores if isinstance(v, (int, float)) and not isinstance(v, bool)]
+
+
+def valor_da_avaliacao(notas_aluno, av):
+    """Nota do aluno na avaliação; a recuperação é achada por qualquer grafia aceita."""
+    if av == AVAL_RECUPERACAO:
+        v = _numeros([x for k, x in notas_aluno.items() if eh_recuperacao(k)])
+        return v[0] if v else None
+    v = notas_aluno.get(av)
+    return v if _numeros([v]) else None
+
+
+def avaliacoes_do_diario(notas, maximo=6):
+    """Colunas de avaliação do Diário: as regulares em ordem alfabética e, se houver,
+    a recuperação por último; no máximo `maximo` colunas no total."""
+    chaves = {av for reg in notas.values() for av in reg}
+    regulares = sorted(av for av in chaves if not eh_recuperacao(av))
+    tem_rec = any(eh_recuperacao(av) for av in chaves)
+    if tem_rec:
+        return regulares[:maximo - 1] + [AVAL_RECUPERACAO]
+    return regulares[:maximo]
+
+
+def rotulo_avaliacao(av):
+    return "REC" if av == AVAL_RECUPERACAO else av
+
+
+def calcular_situacao(notas_aluno):
+    """Aplica a regra da escola às notas de um aluno numa matéria.
+
+    Retorna dict: media (a que vale: a das avaliações, ou a da recuperação quando houve),
+    media_avaliacoes, recuperacao (nota ou None), por_recuperacao (bool) e situacao:
+    'sem_notas' | 'aprovado' | 'recuperacao' (média < 60, ainda sem nota de recuperação) | 'reprovado'.
+    """
+    regulares = _numeros([v for k, v in notas_aluno.items() if not eh_recuperacao(k)])
+    rec = valor_da_avaliacao(notas_aluno, AVAL_RECUPERACAO)
+    if not regulares:
+        return {"media": None, "media_avaliacoes": None, "recuperacao": rec,
+                "por_recuperacao": False, "situacao": "sem_notas"}
+    media_av = _arred2(_soma(regulares) / len(regulares))
+    if media_av >= MEDIA_APROVACAO:
+        return {"media": media_av, "media_avaliacoes": media_av, "recuperacao": rec,
+                "por_recuperacao": False, "situacao": "aprovado"}
+    if rec is None:
+        return {"media": media_av, "media_avaliacoes": media_av, "recuperacao": None,
+                "por_recuperacao": False, "situacao": "recuperacao"}
+    rec = _arred2(rec)
+    return {"media": rec, "media_avaliacoes": media_av, "recuperacao": rec,
+            "por_recuperacao": True,
+            "situacao": "aprovado" if rec >= MEDIA_APROVACAO else "reprovado"}
 
 # --- Medidas (pt) -----------------------------------------------------------
 MARGEM = 28
@@ -147,7 +232,7 @@ def _tabela_frente(alunos, bloco, ultimo, avals, chamadas, notas, datas_total):
         if n_a:
             r0[col_a0] = "AVALIAÇÕES"
         for i, av in enumerate(avals):
-            r1[col_a0 + i] = _cortar(av, "Helvetica-Bold", 8, W_AVAL - 4)
+            r1[col_a0 + i] = _cortar(rotulo_avaliacao(av), "Helvetica-Bold", 8, W_AVAL - 4)
         r0[col_media], r0[col_faltas] = "Média", "Faltas"
 
     linhas = [r0, r1]
@@ -161,13 +246,12 @@ def _tabela_frente(alunos, bloco, ultimo, avals, chamadas, notas, datas_total):
             linha[col_d0 + i] = "P" if p is True else ("F" if p is False else "")
         if ultimo:
             na = notas.get(mat, {})
-            vals = []
             for i, av in enumerate(avals):
-                v = na.get(av)
-                if isinstance(v, (int, float)):
+                v = valor_da_avaliacao(na, av)
+                if v is not None:
                     linha[col_a0 + i] = _fmt_num(v, 1)
-                    vals.append(v)
-            linha[col_media] = _fmt_num(sum(vals) / len(vals), 2) if vals else ""
+            media = calcular_situacao(na)["media"]   # com recuperação, vale a nota dela
+            linha[col_media] = _fmt_num(media, 2) if media is not None else ""
             linha[col_faltas] = str(AULAS_POR_DIA * sum(1 for d in datas_total if ch.get(d) is False))
         linhas.append(linha)
 
@@ -269,6 +353,10 @@ def gerar_diario_pdf(instituicao, curso, materia, professor, turma, ano,
     st_legenda = ParagraphStyle("leg", fontName="Helvetica-Oblique", fontSize=8,
                                 textColor=colors.HexColor("#475569"))
 
+    leg_notas = f" &nbsp;&nbsp;|&nbsp;&nbsp; média mínima para aprovação: {MEDIA_APROVACAO}"
+    if AVAL_RECUPERACAO in avals:
+        leg_notas += " &nbsp;&nbsp;|&nbsp;&nbsp; REC = recuperação (a média passa a ser a nota da recuperação)"
+
     story = []
     blocos = _dividir_datas(datas, len(avals))
     for i, bloco in enumerate(blocos):
@@ -278,7 +366,7 @@ def gerar_diario_pdf(instituicao, curso, materia, professor, turma, ano,
                             logo_bytes, titulo)
         story.append(_tabela_frente(alunos, bloco, ultimo, avals, chamadas, notas, datas))
         story += [Spacer(1, 8),
-                  Paragraph(f"Legenda: P = presente &nbsp;&nbsp; F = falta &nbsp;&nbsp;|&nbsp;&nbsp; cada dia de aula = {AULAS_POR_DIA} horas-aula (as faltas são contadas em horas-aula)", st_legenda),
+                  Paragraph(f"Legenda: P = presente &nbsp;&nbsp; F = falta &nbsp;&nbsp;|&nbsp;&nbsp; cada dia de aula = {AULAS_POR_DIA} horas-aula (as faltas são contadas em horas-aula){leg_notas}", st_legenda),
                   PageBreak()]
 
     story += _verso(datas, conteudos, professor)
