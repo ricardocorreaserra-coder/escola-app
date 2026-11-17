@@ -564,6 +564,7 @@ tr.group-row td {
           </select>
         </div>
       </div>
+      <div id="a-sem-turma-aviso" style="display:none; margin-bottom:12px; font-size:.9rem; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px"></div>
       <div class="table-container">
         <table id="t-alunos">
           <thead>
@@ -1122,13 +1123,13 @@ async function api(url,method='GET',body=null){
 async function refresh(){
   dados=await api('/api/dados');
   aplicarPermissoes();
+  populateSelects();   // antes das listas: o filtro de turma precisa estar atualizado quando a tabela de alunos for desenhada
   renderAlunos();
   renderTurmas();
   renderProfessores();
   renderMaterias();
   renderAtribuicoes();
   renderAssoc();
-  populateSelects();
   renderConteudos();
   renderLogoPreview();
   renderConversaoNotas();
@@ -1230,11 +1231,28 @@ function linhaAluno(mat,a){
     </tr>`;
 }
 
+const FILTRO_SEM_TURMA='__sem_turma__';
+
+function filtrarSemTurma(){
+  document.getElementById('f-turma').value=FILTRO_SEM_TURMA;
+  renderAlunos();
+}
+
 function renderAlunos(){
   const tb=document.querySelector('#t-alunos tbody');
   const filtro=document.getElementById('f-turma')?.value||'';
   let rows=alunosOrdenados();
-  if(filtro) rows=rows.filter(([,a])=>(a.turma||'')===filtro);
+  const semTurma=rows.filter(([,a])=>!a.turma).length;
+  const aviso=document.getElementById('a-sem-turma-aviso');
+  if(aviso){
+    if(semTurma&&filtro!==FILTRO_SEM_TURMA){
+      aviso.innerHTML=`<strong>${semTurma} aluno(s) sem turma.</strong> <a href="#" onclick="filtrarSemTurma();return false" style="color:#b45309; text-decoration:underline">Ver só esses</a>`;
+      aviso.style.display='';
+    }else{
+      aviso.style.display='none';
+    }
+  }
+  if(filtro) rows=rows.filter(([,a])=>filtro===FILTRO_SEM_TURMA?!a.turma:(a.turma||'')===filtro);
   if(!rows.length){
     tb.innerHTML='<tr><td colspan="4" style="color:#94a3b8" class="text-center">Nenhum aluno cadastrado.</td></tr>';
     return;
@@ -1325,7 +1343,11 @@ function populateSelects(){
   ['as-aluno','bl-aluno','att-aluno'].forEach(id=>{
     const s=document.getElementById(id);
     const v=s.value;
-    s.innerHTML='<option value="">Selecione o aluno</option>'+opcoesAlunosAgrupadas(alunos);
+    // Para associar a uma turma, os alunos sem turma vêm primeiro: são justamente os que precisam dela
+    const lista=id==='att-aluno'
+      ?[...alunos.filter(([,a])=>!a.turma),...alunos.filter(([,a])=>a.turma)]
+      :alunos;
+    s.innerHTML='<option value="">Selecione o aluno</option>'+opcoesAlunosAgrupadas(lista);
     s.value=v;
   });
   ['as-mat','ch-mat','nt-mat','dr-materia','cl-mat'].forEach(id=>{
@@ -1341,7 +1363,10 @@ function populateSelects(){
 
   const fs=document.getElementById('f-turma');
   const v2=fs.value;
-  fs.innerHTML='<option value="">Todas as turmas</option>'+turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const qtdSemTurma=alunos.filter(([,a])=>!a.turma).length;
+  fs.innerHTML='<option value="">Todas as turmas</option>'
+    +(qtdSemTurma?`<option value="${FILTRO_SEM_TURMA}">Sem turma (${qtdSemTurma})</option>`:'')
+    +turmas.map(t=>`<option value="${t}">${t}</option>`).join('');
   fs.value=v2;
 
   const ts=document.getElementById('att-turma');
