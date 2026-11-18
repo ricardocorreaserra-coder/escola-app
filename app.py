@@ -329,6 +329,24 @@ def get_dados():
         out["conversao_notas"] = _situacao_conversao_notas(d)
     return jsonify(out)
 
+def _materias_da_turma(d, turma):
+    """Matérias atribuídas a algum professor nesta turma."""
+    return sorted({a.get("materia") for a in d.get("atribuicoes", [])
+                   if a.get("turma") == turma and a.get("materia") in d["materias"]})
+
+def _dar_materias_da_turma(d, aluno, turma):
+    """Dá ao aluno as matérias atribuídas à turma. Retorna as que foram acrescentadas.
+    Só acrescenta; nunca retira nada."""
+    novas = []
+    if not turma:
+        return novas
+    lista = aluno.setdefault("materias", [])
+    for m in _materias_da_turma(d, turma):
+        if m not in lista:
+            lista.append(m)
+            novas.append(m)
+    return novas
+
 def _resumo_notas(d):
     vals = [v for m in d["materias"].values() for reg in (m.get("notas") or {}).values()
             for v in reg.values() if isinstance(v, (int, float)) and not isinstance(v, bool)]
@@ -386,8 +404,9 @@ def add_aluno():
     while mat in d["alunos"]:
         mat = str(uuid.uuid4())[:8]
     d["alunos"][mat] = {"nome": nome, "materias": [], "turma": turma}
+    novas = _dar_materias_da_turma(d, d["alunos"][mat], turma)
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "materias_associadas": novas})
 
 @app.route("/api/alunos/importar", methods=["POST"])
 @papel_required("admin", "secretaria")
@@ -454,6 +473,7 @@ def importar_alunos():
         while mat in d["alunos"]:
             mat = str(uuid.uuid4())[:8]
         d["alunos"][mat] = {"nome": nome, "materias": [], "turma": turma_final}
+        _dar_materias_da_turma(d, d["alunos"][mat], turma_final)
         nomes_existentes.add(nome.lower())
         criados += 1
 
@@ -488,13 +508,17 @@ def edit_aluno(matricula):
     if any(a["nome"].lower() == nome.lower() and k != matricula for k, a in d["alunos"].items()):
         return jsonify({"erro": "Já existe um aluno com esse nome."}), 400
     d["alunos"][matricula]["nome"] = nome
+    novas = []
     if "turma" in body:
         turma = sanitize(body.get("turma", "")) if body.get("turma") else ""
         if turma and turma not in d["turmas"]:
             return jsonify({"erro": "Turma não encontrada."}), 404
+        mudou = turma != d["alunos"][matricula].get("turma", "")
         d["alunos"][matricula]["turma"] = turma
+        if mudou:
+            novas = _dar_materias_da_turma(d, d["alunos"][matricula], turma)
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "materias_associadas": novas})
 
 @app.route("/api/alunos/<matricula>/materias", methods=["POST"])
 @papel_required("admin", "secretaria")
@@ -655,6 +679,27 @@ def associar_turma_materia(turma):
             afetados += 1
     save(d)
     return jsonify({"ok": True, "afetados": afetados})
+
+@app.route("/api/turmas/<turma>/sincronizar-materias", methods=["POST"])
+@papel_required("admin", "secretaria")
+def sincronizar_materias_turma(turma):
+    """Liga todos os alunos da turma às matérias atribuídas a ela. Só acrescenta."""
+    d = load()
+    turma = sanitize(turma)
+    if turma not in d["turmas"]:
+        return jsonify({"erro": "Turma não encontrada."}), 404
+    materias = _materias_da_turma(d, turma)
+    if not materias:
+        return jsonify({"erro": "Esta turma ainda não tem matérias atribuídas a professores."}), 400
+    alunos_afetados, acrescimos = 0, 0
+    for aluno in d["alunos"].values():
+        if aluno.get("turma") == turma:
+            novas = _dar_materias_da_turma(d, aluno, turma)
+            if novas:
+                alunos_afetados += 1
+                acrescimos += len(novas)
+    save(d)
+    return jsonify({"ok": True, "materias": materias, "alunos_afetados": alunos_afetados, "acrescimos": acrescimos})
 
 @app.route("/api/turmas/<turma>/desassociar-materia", methods=["POST"])
 @papel_required("admin", "secretaria")
@@ -1021,9 +1066,11 @@ def assoc_turma(matricula):
         return jsonify({"erro": "Aluno não encontrado."}), 404
     if turma not in d["turmas"]:
         return jsonify({"erro": "Turma não encontrada."}), 404
+    mudou = turma != d["alunos"][matricula].get("turma", "")
     d["alunos"][matricula]["turma"] = turma
+    novas = _dar_materias_da_turma(d, d["alunos"][matricula], turma) if mudou else []
     save(d)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "materias_associadas": novas})
 
 @app.route("/api/alunos/<matricula>/turma", methods=["DELETE"])
 @papel_required("admin", "secretaria")
