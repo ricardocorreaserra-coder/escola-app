@@ -604,7 +604,7 @@ tr.group-row td {
             <tr>
               <th>Turma</th>
               <th>Alunos</th>
-              <th style="width: 80px;" class="text-center">Ações</th>
+              <th style="width: 110px;" class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -612,6 +612,7 @@ tr.group-row td {
           </tbody>
         </table>
       </div>
+      <div class="msg" id="t-sync-msg"></div>
     </div>
   </div>
 
@@ -883,6 +884,7 @@ tr.group-row td {
     </div>
     <div class="card">
       <h3>Presença</h3>
+      <div id="ch-aviso-assoc" style="margin-bottom:.75rem"></div>
       <div id="ch-status" style="font-size:.9rem;margin-bottom:.75rem;color:#64748b"></div>
       <div id="ch-lista" style="color:#94a3b8">Selecione uma matéria para ver os alunos.</div>
     </div>
@@ -1270,6 +1272,28 @@ function renderAlunos(){
   tb.innerHTML=html;
 }
 
+async function sincronizarTurma(turma){   // turma: valor sem escape (veio de data-t)
+  const msg=document.getElementById('t-sync-msg');
+  const mats=[...new Set((dados.atribuicoes||[]).filter(a=>a.turma===chaveDe(turma)).map(a=>a.materia))];
+  if(!mats.length){
+    msg.style.color='#ef4444';
+    msg.textContent='Esta turma ainda não tem matérias atribuídas a professores. Crie as atribuições primeiro.';
+    return;
+  }
+  if(!confirm(`Associar todos os alunos da turma "${turma}" às matérias atribuídas a ela?\n\nMatérias: ${mats.map(textoDe).join(', ')}\n\nQuem já tem a matéria não é afetado. Uma matéria que você tenha retirado de algum aluno será colocada de volta.`)) return;
+  const r=await api('/api/turmas/'+encodeURIComponent(turma)+'/sincronizar-materias','POST',{});
+  if(r.ok){
+    msg.style.color='#10b981';
+    msg.textContent=r.alunos_afetados
+      ?`✓ ${r.alunos_afetados} aluno(s) da turma "${turma}" receberam matérias que faltavam (${r.acrescimos} associação(ões)).`
+      :`Todos os alunos da turma "${turma}" já tinham as matérias atribuídas.`;
+    refresh();
+  }else{
+    msg.style.color='#ef4444';
+    msg.textContent=r.erro||'Não foi possível associar.';
+  }
+}
+
 function renderTurmas(){
   const tb=document.querySelector('#t-turmas tbody');
   const nomes=Object.keys(dados.turmas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -1284,6 +1308,7 @@ function renderTurmas(){
       <td class="font-medium">${nome}</td>
       <td>${qtd}</td>
       <td class="text-center">
+        <button class="btn-icon btn-edit" title="Associar alunos às matérias" data-t="${nome}" onclick="sincronizarTurma(this.dataset.t)"><i class="ti ti-refresh"></i></button>
         <button class="btn-icon btn-delete" onclick="delTurma('${nome.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
       </td>
     </tr>
@@ -1456,11 +1481,21 @@ async function salvarEdicao(){
   const r=await api('/api/alunos/'+encodeURIComponent(editandoId),'PUT',{nome,turma});
   if(r.ok){
     fecharModal();
+    if(r.materias_associadas&&r.materias_associadas.length){
+      const m=document.getElementById('a-msg');
+      m.style.color='#10b981';
+      m.textContent='Aluno atualizado.'+textoMateriasAssociadas(r);
+    }
     refresh();
   }else{
     document.getElementById('edit-msg').style.color='#ef4444';
     document.getElementById('edit-msg').textContent=r.erro;
   }
+}
+
+function textoMateriasAssociadas(r){
+  const m=(r&&r.materias_associadas)||[];
+  return m.length?` Associado também às matérias da turma: ${m.join(', ')}.`:'';
 }
 
 async function addAluno(){
@@ -1470,7 +1505,7 @@ async function addAluno(){
   const msg=document.getElementById('a-msg');
   if(r.ok){
     msg.style.color='#10b981';
-    msg.textContent='Aluno cadastrado com sucesso!';
+    msg.textContent='Aluno cadastrado com sucesso!'+textoMateriasAssociadas(r);
     document.getElementById('a-nome').value='';
     document.getElementById('a-turma').value='';
     refresh();
@@ -1570,7 +1605,7 @@ async function associarTurma(){
   const msg=document.getElementById('att-msg');
   if(r.ok){
     msg.style.color='#10b981';
-    msg.textContent='Associação realizada!';
+    msg.textContent='Associação realizada!'+textoMateriasAssociadas(r);
     refresh();
   }else{
     msg.style.color='#ef4444';
@@ -1606,6 +1641,23 @@ function _fmtDataBR(data){
 
 // Os nomes ficam guardados escapados (ex.: D&#x27;Ávila), mas o valor lido de um <select> vem sem o escape.
 // chaveDe() devolve a forma guardada, para buscar em dados.* sem errar com apóstrofo, & etc.
+function textoDe(v){   // desfaz o escape de um nome guardado (D&#x27;Ávila -> D'Ávila), para mostrar em confirm()/alert
+  const t=document.createElement('textarea');
+  t.innerHTML=String(v||'');
+  return t.value;
+}
+
+// Alunos das turmas desta matéria que não estão associados a ela (e por isso não aparecem na chamada/notas).
+// Só o administrador tem a lista completa de alunos; para os demais perfis volta vazio.
+function avisoAlunosForaDaMateria(materia){   // materia: forma guardada
+  if(!materia||dados.eu?.papel!=='admin') return '';
+  const turmas=new Set((dados.atribuicoes||[]).filter(a=>a.materia===materia).map(a=>a.turma));
+  const fora=alunosOrdenados().filter(([,a])=>a.turma&&turmas.has(a.turma)&&!(a.materias||[]).includes(materia)).map(([,a])=>a.nome);
+  if(!fora.length) return '';
+  const lista=fora.slice(0,8).join(', ')+(fora.length>8?` e mais ${fora.length-8}`:'');
+  return `<div class="regra-notas" style="color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px"><strong>${fora.length} aluno(s) das turmas desta matéria não estão associados a ela</strong> e por isso não aparecem aqui: ${lista}. Associe-os na aba <strong>Associar</strong> ou use o botão “Associar alunos às matérias” (ícone de atualizar) na aba <strong>Turmas</strong>.</div>`;
+}
+
 function chaveDe(v){
   return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
@@ -1828,6 +1880,7 @@ function loadChamada(){
   document.getElementById('ch-msg').textContent='';
   status.textContent='';
   renderChamadaDatas(mat,data);
+  document.getElementById('ch-aviso-assoc').innerHTML=mat?avisoAlunosForaDaMateria(chaveDe(mat)):'';
   if(!mat){
     div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Selecione uma matéria para ver os alunos.</div>';
     return;
@@ -2002,7 +2055,7 @@ function loadNotas(){
   
   const alunos=alunosOrdenados().filter(([,a])=>(a.materias||[]).includes(mat));
   if(!alunos.length){
-    div.innerHTML='<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
+    div.innerHTML=avisoAlunosForaDaMateria(chaveDe(mat))+'<div style="padding: 1rem; text-align: center; color: #64748b;">Nenhum aluno associado a esta matéria.</div>';
     return;
   }
 
@@ -2031,7 +2084,7 @@ function renderNotasTable(alunos,mat){
   const div=document.getElementById('nt-lista');
   const R=regrasNotas();
   
-  let html='';
+  let html=avisoAlunosForaDaMateria(chaveDe(mat));
   if(dados.conversao_notas?.pendente){
     html+='<div class="regra-notas" style="color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px"><strong>Atenção:</strong> há notas antigas (escala 0–10) ainda não convertidas para 0–100. Abra a aba <strong>Backup</strong> e use “Converter notas antigas”.</div>';
   }
