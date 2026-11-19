@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file, g, has_request_context
+from werkzeug.exceptions import HTTPException
 import os, html, psycopg2, sqlite3, json, uuid, time, datetime, base64, re, csv, io
 from io import BytesIO
 from functools import wraps
@@ -91,6 +92,22 @@ def bootstrap_admin():
         save(d)
         print("Usuário inicial 'admin' criado com sucesso.")
 
+class ConflitoDeVersao(Exception):
+    """Alguém gravou entre a leitura e a gravação desta requisição."""
+
+MAX_TENTATIVAS_CONFLITO = 5
+
+def _garantir_coluna_versao(conn, c):
+    """Controle otimista de concorrência: coluna `versao` na linha única de `dados`.
+    Idempotente; linhas existentes começam na versão 1."""
+    if DATABASE_URL:
+        c.execute("ALTER TABLE dados ADD COLUMN IF NOT EXISTS versao INTEGER NOT NULL DEFAULT 1")
+    else:
+        c.execute("PRAGMA table_info(dados)")
+        if "versao" not in [r[1] for r in c.fetchall()]:
+            c.execute("ALTER TABLE dados ADD COLUMN versao INTEGER NOT NULL DEFAULT 1")
+    conn.commit()
+
 def init_db():
     conn = get_conn()
     c = conn.cursor()
@@ -119,6 +136,7 @@ def init_db():
                 VALUES (1, '{"alunos": {}, "materias": {}, "usuarios": {}, "turmas": {}}')
             """)
         conn.commit()
+        _garantir_coluna_versao(conn, c)
     finally:
         c.close()
         conn.close()
@@ -146,14 +164,19 @@ REGRAS_NOTAS = {"nota_maxima": NOTA_MAXIMA, "media_aprovacao": MEDIA_APROVACAO,
                 "recuperacao": AVAL_RECUPERACAO}
 
 def _load_db():
+    return _load_db_versao()[0]
+
+def _load_db_versao():
+    """Lê o JSON e a versão da linha. Retorna (dados, versao); versao None se não houver linha."""
     conn = get_conn()
     c = conn.cursor()
     try:
-        c.execute("SELECT conteudo FROM dados WHERE id = 1")
+        c.execute("SELECT conteudo, versao FROM dados WHERE id = 1")
         row = c.fetchone()
         if not row:
-            return {"alunos": {}, "materias": {}, "usuarios": {}}
+            return {"alunos": {}, "materias": {}, "usuarios": {}}, None
         val = row[0]
+        versao = row[1]
         if isinstance(val, str):
             d = json.loads(val)
         else:
@@ -171,18 +194,46 @@ def _load_db():
         if "atribuicoes" not in d:
             d["atribuicoes"] = []
         _migrar_conteudos(d)
-        return d
+        return d, versao
     finally:
         c.close()
         conn.close()
 
-def _save_db(dados):
+def _save_db(dados, versao=None):
+    """Grava o JSON. Com `versao`, só grava se a linha ainda estiver nessa versão
+    (senão levanta ConflitoDeVersao). Sem `versao`, grava sem checar. Retorna a nova versão."""
     placeholder = "%s" if DATABASE_URL else "?"
     conn = get_conn()
     c = conn.cursor()
     try:
-        c.execute(f"UPDATE dados SET conteudo = {placeholder} WHERE id = 1", [json.dumps(dados)])
+        if versao is None:
+            c.execute(f"UPDATE dados SET conteudo = {placeholder}, versao = versao + 1 WHERE id = 1 "
+                      "RETURNING versao" if DATABASE_URL else
+                      f"UPDATE dados SET conteudo = {placeholder}, versao = versao + 1 WHERE id = 1",
+                      [json.dumps(dados)])
+        else:
+            c.execute(f"UPDATE dados SET conteudo = {placeholder}, versao = versao + 1 "
+                      f"WHERE id = 1 AND versao = {placeholder}"
+                      + (" RETURNING versao" if DATABASE_URL else ""),
+                      [json.dumps(dados), versao])
+        if DATABASE_URL:
+            row = c.fetchone()
+            nova = row[0] if row else None
+        else:
+            nova = (versao + 1) if (versao is not None and c.rowcount == 1) else None
+            if versao is None and c.rowcount == 1:
+                c.execute("SELECT versao FROM dados WHERE id = 1")
+                nova = c.fetchone()[0]
+        if nova is None:
+            conn.rollback()
+            raise ConflitoDeVersao()
         conn.commit()
+        return nova
+    except ConflitoDeVersao:
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         c.close()
         conn.close()
@@ -192,14 +243,39 @@ def load():
     # e a rota compartilham o mesmo objeto).
     if has_request_context():
         if not hasattr(g, "_dados"):
-            g._dados = _load_db()
+            g._dados, g._versao = _load_db_versao()
         return g._dados
     return _load_db()
 
 def save(dados):
-    _save_db(dados)
+    # Dentro de uma requisição, só grava se ninguém tiver gravado desde a leitura (ConflitoDeVersao
+    # é tratado por _repetir_apos_conflito, que refaz a requisição sobre os dados atualizados).
     if has_request_context():
+        nova = _save_db(dados, getattr(g, "_versao", None))
         g._dados = dados
+        g._versao = nova
+    else:
+        _save_db(dados)
+
+@app.errorhandler(ConflitoDeVersao)
+def _repetir_apos_conflito(_e):
+    """Outra gravação aconteceu entre a leitura e a gravação desta requisição. Nada foi perdido:
+    relê os dados atuais e refaz a rota inteira (as rotas são pequenas mudanças e idempotentes)."""
+    for _ in range(MAX_TENTATIVAS_CONFLITO):
+        g.pop("_dados", None)
+        g.pop("_versao", None)
+        for f in request.files.values():
+            try:
+                f.stream.seek(0)
+            except Exception:
+                pass
+        try:
+            return app.make_response(app.view_functions[request.endpoint](**(request.view_args or {})))
+        except ConflitoDeVersao:
+            continue
+        except HTTPException as he:
+            return he
+    return jsonify({"erro": "O sistema estava muito ocupado e não conseguiu salvar. Tente novamente."}), 409
 
 def sanitize(text):
     # unescape antes de escapar: é idempotente (nomes com & ou ' não são escapados duas vezes
